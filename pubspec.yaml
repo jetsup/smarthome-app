@@ -1,0 +1,27 @@
+name: smarthome_app
+description: SmartHome mobile app for managing gateways and nodes.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0-24.0.dev
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  dio: ^5.4.0
+  multicast_dns: ^0.3.2
+  connectivity_plus: ^6.0.0
+  shared_preferences: ^2.2.2
+  flutter_riverpod: ^2.4.9
+  flutter_secure_storage: ^9.2.0
+  flutter_local_notifications: ^18.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
