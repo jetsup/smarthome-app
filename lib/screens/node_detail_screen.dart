@@ -354,6 +354,53 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
       );
     }
 
+    // Input capability types — show telemetry value like Vue does
+    if (cap.type == 'analogInput') {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
+                      style: const TextStyle(color: Color(0xFFc9d1d9), fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
+                      style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+                ],
+              ),
+            ),
+            Text('${node.value ?? '—'}',
+                style: const TextStyle(color: Color(0xFF8b949e), fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
+    if (cap.type == 'digitalInput') {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
+                      style: const TextStyle(color: Color(0xFFc9d1d9), fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
+                      style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+                ],
+              ),
+            ),
+            Text((node.value ?? 0) > 0 ? 'HIGH' : 'LOW',
+                style: const TextStyle(color: Color(0xFF8b949e), fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
     // Other capability types (display only)
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
