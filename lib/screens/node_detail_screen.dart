@@ -18,13 +18,13 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
   Timer? _pollTimer;
   int? _dragIndex;
   double _dragValue = 0;
+  SmartNode? _detailNode;
 
   @override
   void initState() {
     super.initState();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      ref.read(nodesProvider(widget.gatewayId).notifier).fetchNodeDetail(widget.node.nodeId);
-    });
+    _fetchDetail();
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _fetchDetail());
   }
 
   @override
@@ -33,25 +33,65 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
     super.dispose();
   }
 
+  Future<void> _fetchDetail() async {
+    final api = ref.read(apiServiceProvider);
+    try {
+      final response = await api.get('/api/nodes/${widget.node.nodeId}');
+      if (mounted) {
+        setState(() {
+          _detailNode = SmartNode.fromJson(response.data as Map<String, dynamic>);
+        });
+      }
+    } catch (_) {}
+  }
+
   Future<void> _sendCommand(int value, {int? pin}) async {
     setState(() => _sending = true);
+
+    // Optimistic update: immediately reflect the change locally
+    _applyOptimistic(value, pin: pin);
+
     final nid = widget.node.nodeId;
     if (nid.isNotEmpty) {
-      final ok = await ref.read(nodesProvider(widget.gatewayId).notifier).sendCommand(nid, value, pin: pin);
-      if (ok && mounted) {
-        // Optimistically update the node in the provider
-        ref.read(nodesProvider(widget.gatewayId).notifier).fetchNodeDetail(nid);
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ok ? 'Command sent' : 'Failed to send'),
-            backgroundColor: ok ? const Color(0xFF238636) : const Color(0xFFf85149),
-          ),
-        );
-      }
+      await ref.read(nodesProvider(widget.gatewayId).notifier).sendCommand(nid, value, pin: pin);
+      // Fetch actual state from hub to confirm
+      _fetchDetail();
     }
-    setState(() => _sending = false);
+    if (mounted) setState(() => _sending = false);
+  }
+
+  void _applyOptimistic(int value, {int? pin}) {
+    final node = _detailNode ?? widget.node;
+    final caps = node.capabilitiesConfig;
+    if (caps.isEmpty) return;
+    if (pin != null) {
+      // Find the capability with this pin and update its value
+      final updated = caps.map((c) {
+        if (c.pin == pin) {
+          return CapabilityConfig(
+            type: c.type,
+            pin: c.pin,
+            extra: c.extra,
+            label: c.label,
+            value: value,
+          );
+        }
+        return c;
+      }).toList();
+      _detailNode = SmartNode(
+        nodeId: node.nodeId,
+        deviceId: node.deviceId,
+        gatewayId: node.gatewayId,
+        apiKey: node.apiKey,
+        deviceType: node.deviceType,
+        capabilities: node.capabilities,
+        value: value,
+        isOnline: node.isOnline,
+        lastSeen: node.lastSeen,
+        name: node.name,
+        capabilitiesConfig: updated,
+      );
+    }
   }
 
   String _capTypeLabel(String type) {
@@ -80,7 +120,6 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
       };
       return labels[node.deviceType] ?? 'Unknown';
     }
-    // Infer from capabilities
     if (node.capabilitiesConfig.isEmpty) return 'Unknown';
     final types = node.capabilitiesConfig.map((c) => c.type).toSet();
     if (types.contains('analogInput')) return 'Analog Sensor';
@@ -94,8 +133,7 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final nodes = ref.watch(nodesProvider(widget.gatewayId));
-    final node = nodes.where((n) => n.deviceId == widget.node.deviceId).firstOrNull ?? widget.node;
+    final node = _detailNode ?? widget.node;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0d1117),
