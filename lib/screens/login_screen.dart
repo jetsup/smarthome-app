@@ -17,6 +17,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _loading = false;
   String? _error;
   bool _showHubField = false;
+  bool _passwordVisible = false;
 
   @override
   void dispose() {
@@ -75,7 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ],
               _field('Email', _emailCtrl, keyboardType: TextInputType.emailAddress),
               const SizedBox(height: 8),
-              _field('Password', _passwordCtrl, obscure: true),
+              _passwordField(),
               if (_error != null) ...[
                 const SizedBox(height: 8),
                 Text(_error!, style: const TextStyle(color: Color(0xFFf85149), fontSize: 13)),
@@ -128,6 +129,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF30363d))),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF30363d))),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF58a6ff))),
+      ),
+    );
+  }
+
+  Widget _passwordField() {
+    return TextField(
+      controller: _passwordCtrl,
+      obscureText: !_passwordVisible,
+      style: const TextStyle(color: Color(0xFFc9d1d9)),
+      decoration: InputDecoration(
+        labelText: 'Password',
+        labelStyle: const TextStyle(color: Color(0xFF8b949e)),
+        filled: true,
+        fillColor: const Color(0xFF161b22),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF30363d))),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF30363d))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF58a6ff))),
+        suffixIcon: IconButton(
+          icon: Icon(_passwordVisible ? Icons.visibility : Icons.visibility_off, color: const Color(0xFF8b949e)),
+          onPressed: () => setState(() => _passwordVisible = !_passwordVisible),
+        ),
       ),
     );
   }

@@ -31,7 +31,7 @@ final discoveryResultsProvider = StateProvider<List<Gateway>>((ref) => []);
 
 final splashStateProvider = StateProvider<SplashState>((ref) => SplashState.discovering);
 
-enum SplashState { discovering, found, notFound, authenticated, error }
+enum SplashState { permission, discovering, found, notFound, authenticated, error }
 
 class GatewaysNotifier extends StateNotifier<List<Gateway>> {
   final Ref _ref;
@@ -79,10 +79,23 @@ class NodesNotifier extends StateNotifier<List<SmartNode>> {
     } catch (_) {}
   }
 
-  Future<bool> sendCommand(String nodeId, int value) async {
+  Future<void> fetchNodeDetail(String nodeId) async {
     final api = _ref.read(apiServiceProvider);
     try {
-      await api.post('/api/nodes/$nodeId/command', data: {'value': value});
+      final response = await api.get('/api/nodes/$nodeId');
+      final updated = SmartNode.fromJson(response.data as Map<String, dynamic>);
+      final list = state.where((n) => n.nodeId != nodeId).toList();
+      list.add(updated);
+      state = list;
+    } catch (_) {}
+  }
+
+  Future<bool> sendCommand(String nodeId, int value, {int? pin}) async {
+    final api = _ref.read(apiServiceProvider);
+    try {
+      final payload = <String, dynamic>{'value': value};
+      if (pin != null) payload['pin'] = pin;
+      await api.post('/api/nodes/$nodeId/command', data: payload);
       return true;
     } catch (_) {
       return false;

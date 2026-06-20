@@ -1,4 +1,4 @@
-package com.jetsup.smarthome_app
+package com.jetsup.smarthome
 
 import io.flutter.embedding.android.FlutterActivity
 

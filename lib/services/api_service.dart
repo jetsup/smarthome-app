@@ -54,39 +54,53 @@ class ApiService {
   }
 
   Future<void> loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('auth_token');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _token = prefs.getString('auth_token');
+    } catch (_) {}
   }
 
   Future<void> saveToken(String token) async {
     _token = token;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', token);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', token);
+    } catch (_) {}
   }
 
   Future<void> clearToken() async {
     _token = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+    } catch (_) {}
   }
 
   Future<void> saveCredentials(String email, String password) async {
     _email = email;
     _password = password;
-    await _secure.write(key: 'auth_email', value: email);
-    await _secure.write(key: 'auth_password', value: password);
+    try {
+      await _secure.write(key: 'auth_email', value: email);
+      await _secure.write(key: 'auth_password', value: password);
+    } catch (_) {
+      // Secure storage may be unavailable on some devices
+    }
   }
 
   Future<void> loadCredentials() async {
-    _email = await _secure.read(key: 'auth_email');
-    _password = await _secure.read(key: 'auth_password');
+    try {
+      _email = await _secure.read(key: 'auth_email');
+      _password = await _secure.read(key: 'auth_password');
+    } catch (_) {}
   }
 
   Future<void> clearCredentials() async {
     _email = null;
     _password = null;
-    await _secure.delete(key: 'auth_email');
-    await _secure.delete(key: 'auth_password');
+    try {
+      await _secure.delete(key: 'auth_email');
+      await _secure.delete(key: 'auth_password');
+    } catch (_) {}
   }
 
   bool get hasCredentials => _email != null && _password != null;

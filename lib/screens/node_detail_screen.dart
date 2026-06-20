@@ -14,36 +14,34 @@ class NodeDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
-  final _valueCtrl = TextEditingController();
   bool _sending = false;
   Timer? _pollTimer;
+  int? _dragIndex;
+  double _dragValue = 0;
 
   @override
   void initState() {
     super.initState();
-    _valueCtrl.text = '0';
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      ref.read(nodesProvider(widget.gatewayId).notifier).fetchNodes();
+      ref.read(nodesProvider(widget.gatewayId).notifier).fetchNodeDetail(widget.node.nodeId);
     });
   }
 
   @override
   void dispose() {
-    _valueCtrl.dispose();
     _pollTimer?.cancel();
     super.dispose();
   }
 
-  SmartNode? get _node {
-    final nodes = ref.read(nodesProvider(widget.gatewayId));
-    return nodes.where((n) => n.deviceId == widget.node.deviceId).firstOrNull;
-  }
-
-  Future<void> _sendCommand(int value) async {
+  Future<void> _sendCommand(int value, {int? pin}) async {
     setState(() => _sending = true);
     final nid = widget.node.nodeId;
     if (nid.isNotEmpty) {
-      final ok = await ref.read(nodesProvider(widget.gatewayId).notifier).sendCommand(nid, value);
+      final ok = await ref.read(nodesProvider(widget.gatewayId).notifier).sendCommand(nid, value, pin: pin);
+      if (ok && mounted) {
+        // Optimistically update the node in the provider
+        ref.read(nodesProvider(widget.gatewayId).notifier).fetchNodeDetail(nid);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -56,9 +54,48 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
     setState(() => _sending = false);
   }
 
+  String _capTypeLabel(String type) {
+    const labels = {
+      'analogInput': 'Analog In',
+      'analogOutput': 'Analog Out',
+      'digitalInput': 'Digital In',
+      'digitalOutput': 'Digital Out',
+      'relay': 'Relay',
+      'irTx': 'IR TX',
+      'irRx': 'IR RX',
+      'i2c': 'I2C',
+      'uart': 'UART',
+    };
+    return labels[type] ?? type;
+  }
+
+  String _inferTypeLabel(SmartNode node) {
+    if (node.deviceType != 0) {
+      const labels = {
+        1: 'Analog Sensor',
+        2: 'Digital Sensor',
+        3: 'Relay',
+        4: 'IR Transceiver',
+        5: 'Hybrid',
+      };
+      return labels[node.deviceType] ?? 'Unknown';
+    }
+    // Infer from capabilities
+    if (node.capabilitiesConfig.isEmpty) return 'Unknown';
+    final types = node.capabilitiesConfig.map((c) => c.type).toSet();
+    if (types.contains('analogInput')) return 'Analog Sensor';
+    if (types.contains('digitalInput')) return 'Digital Sensor';
+    if (types.contains('relay')) return 'Relay';
+    if (types.contains('analogOutput')) return 'Analog Output';
+    if (types.contains('digitalOutput')) return 'Digital Output';
+    if (types.contains('irTx') || types.contains('irRx')) return 'IR Transceiver';
+    return 'Hybrid';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final node = _node ?? widget.node;
+    final nodes = ref.watch(nodesProvider(widget.gatewayId));
+    final node = nodes.where((n) => n.deviceId == widget.node.deviceId).firstOrNull ?? widget.node;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0d1117),
@@ -68,12 +105,13 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
           icon: const Icon(Icons.arrow_back, color: Color(0xFF8b949e)),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(node.nodeId.isNotEmpty ? node.nodeId : 'Device ${node.deviceId}',
+        title: Text(node.displayName,
             style: const TextStyle(color: Color(0xFFc9d1d9))),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Status card
           Card(
             color: const Color(0xFF161b22),
             shape: RoundedRectangleBorder(
@@ -98,15 +136,13 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                               color: node.isOnline ? const Color(0xFF3fb950) : const Color(0xFFf85149),
                               fontWeight: FontWeight.w600)),
                       const Spacer(),
-                      Text(node.typeLabel, style: const TextStyle(color: Color(0xFF8b949e), fontSize: 13)),
+                      Text(_inferTypeLabel(node), style: const TextStyle(color: Color(0xFF8b949e), fontSize: 13)),
                     ],
                   ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      _statBox('Value', '${node.value ?? '—'}'),
-                      const SizedBox(width: 12),
-                      _statBox('Type', node.typeLabel),
+                      _statBox('Type', _inferTypeLabel(node)),
                       const SizedBox(width: 12),
                       _statBox('Device ID', '${node.deviceId}'),
                     ],
@@ -116,49 +152,48 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Card(
-            color: const Color(0xFF161b22),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-              side: const BorderSide(color: Color(0xFF30363d)),
+
+          // Per-capability controls
+          if (node.capabilitiesConfig.isNotEmpty) ...[
+            Card(
+              color: const Color(0xFF161b22),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: const BorderSide(color: Color(0xFF30363d)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Capabilities', style: TextStyle(color: Color(0xFFc9d1d9), fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    ...node.capabilitiesConfig.asMap().entries.map((entry) {
+                      final i = entry.key;
+                      final cap = entry.value;
+                      return _capabilityTile(context, node, i, cap);
+                    }),
+                  ],
+                ),
+              ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Control', style: TextStyle(color: Color(0xFFc9d1d9), fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _valueCtrl,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Color(0xFFc9d1d9)),
-                    decoration: InputDecoration(
-                      labelText: 'Value (0–65535)',
-                      labelStyle: const TextStyle(color: Color(0xFF8b949e)),
-                      filled: true,
-                      fillColor: const Color(0xFF0d1117),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF30363d))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF30363d))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF58a6ff))),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _sending ? null : () => _sendCommand(int.tryParse(_valueCtrl.text) ?? 0),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF238636),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: _sending
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Send Command', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                    ),
-                  ),
-                  if (node.deviceType == 3) ...[
+            const SizedBox(height: 16),
+          ],
+
+          // Fallback for old relay nodes without capabilities
+          if (node.capabilitiesConfig.isEmpty && node.deviceType == 3) ...[
+            Card(
+              color: const Color(0xFF161b22),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: const BorderSide(color: Color(0xFF30363d)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Relay Control', style: TextStyle(color: Color(0xFFc9d1d9), fontWeight: FontWeight.w600)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -188,10 +223,117 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                       ],
                     ),
                   ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _capabilityTile(BuildContext context, SmartNode node, int index, CapabilityConfig cap) {
+    if (cap.type == 'digitalOutput' || cap.type == 'relay') {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
+                      style: const TextStyle(color: Color(0xFFc9d1d9), fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
+                      style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
                 ],
               ),
             ),
+            ElevatedButton(
+              onPressed: _sending ? null : () => _sendCommand((cap.value ?? 0) > 0 ? 0 : 1, pin: cap.pin),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: (cap.value ?? 0) > 0 ? const Color(0xFF238636) : const Color(0xFF21262d),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+              child: Text((cap.value ?? 0) > 0 ? 'ON' : 'OFF',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (cap.type == 'analogOutput') {
+      final sliderVal = _dragIndex == index ? _dragValue : (cap.value?.toDouble() ?? 0);
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
+                          style: const TextStyle(color: Color(0xFFc9d1d9), fontSize: 14, fontWeight: FontWeight.w600)),
+                      Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
+                          style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+                    ],
+                  ),
+                ),
+                Text('${sliderVal.toInt()}',
+                    style: const TextStyle(color: Color(0xFFc9d1d9), fontWeight: FontWeight.w600, fontSize: 14)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            SliderTheme(
+              data: SliderThemeData(
+                trackHeight: 4,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                activeTrackColor: const Color(0xFF58a6ff),
+                inactiveTrackColor: const Color(0xFF30363d),
+                thumbColor: const Color(0xFF58a6ff),
+                overlayColor: const Color(0x2058a6ff),
+              ),
+              child: Slider(
+                min: 0,
+                max: 255,
+                divisions: 255,
+                value: sliderVal,
+                onChanged: (v) => setState(() { _dragIndex = index; _dragValue = v; }),
+                onChangeEnd: (v) {
+                  setState(() => _dragIndex = null);
+                  _sendCommand(v.toInt(), pin: cap.pin);
+                },
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Other capability types (display only)
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
+                    style: const TextStyle(color: Color(0xFFc9d1d9), fontSize: 14, fontWeight: FontWeight.w600)),
+                Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
+                    style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+              ],
+            ),
           ),
+          Text(cap.value?.toString() ?? '—',
+              style: const TextStyle(color: Color(0xFF8b949e), fontSize: 14)),
         ],
       ),
     );

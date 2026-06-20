@@ -73,7 +73,7 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
-    ref.read(connectivityServiceProvider).stopMonitoring();
+    try { ref.read(connectivityServiceProvider).stopMonitoring(); } catch (_) {}
     super.dispose();
   }
 
