@@ -45,6 +45,8 @@ class SmartNode {
   final String? lastSeen;
   final String name;
   final List<CapabilityConfig> capabilitiesConfig;
+  /// The one display this node is shown on (null = not assigned to any display).
+  final int? hmiId;
 
   SmartNode({
     required this.nodeId,
@@ -58,6 +60,7 @@ class SmartNode {
     this.lastSeen,
     this.name = '',
     this.capabilitiesConfig = const [],
+    this.hmiId,
   });
 
   factory SmartNode.fromJson(Map<String, dynamic> json) {
@@ -94,6 +97,7 @@ class SmartNode {
       lastSeen: json['lastSeen'] as String? ?? json['last_seen'] as String?,
       name: json['name'] as String? ?? '',
       capabilitiesConfig: caps,
+      hmiId: json['hmiId'] as int?,
     );
   }
 

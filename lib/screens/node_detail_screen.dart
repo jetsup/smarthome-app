@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/node.dart';
 import '../providers/providers.dart';
+import '../theme/app_colors.dart';
+import '../widgets/node_display_card.dart';
 
 class NodeDetailScreen extends ConsumerStatefulWidget {
   final SmartNode node;
@@ -90,6 +92,7 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
         lastSeen: node.lastSeen,
         name: node.name,
         capabilitiesConfig: updated,
+        hmiId: node.hmiId,
       );
     }
   }
@@ -136,25 +139,25 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
     final node = _detailNode ?? widget.node;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0d1117),
+      backgroundColor: context.c.bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF161b22),
+        backgroundColor: context.c.card,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF8b949e)),
+          icon: Icon(Icons.arrow_back, color: context.c.muted),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(node.displayName,
-            style: const TextStyle(color: Color(0xFFc9d1d9))),
+            style: TextStyle(color: context.c.text)),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // Status card
           Card(
-            color: const Color(0xFF161b22),
+            color: context.c.card,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
-              side: const BorderSide(color: Color(0xFF30363d)),
+              side: BorderSide(color: context.c.border),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -164,17 +167,17 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                     children: [
                       Container(width: 10, height: 10,
                         decoration: BoxDecoration(
-                          color: node.isOnline ? const Color(0xFF3fb950) : const Color(0xFF484f58),
+                          color: node.isOnline ? context.c.ok : context.c.subtle,
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(node.isOnline ? 'Online' : 'Offline',
                           style: TextStyle(
-                              color: node.isOnline ? const Color(0xFF3fb950) : const Color(0xFFf85149),
+                              color: node.isOnline ? context.c.ok : context.c.bad,
                               fontWeight: FontWeight.w600)),
                       const Spacer(),
-                      Text(_inferTypeLabel(node), style: const TextStyle(color: Color(0xFF8b949e), fontSize: 13)),
+                      Text(_inferTypeLabel(node), style: TextStyle(color: context.c.muted, fontSize: 13)),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -191,20 +194,23 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
           ),
           const SizedBox(height: 16),
 
+          // Which display shows this node (a node is on one display only)
+          NodeDisplayCard(nodeId: node.nodeId, gatewayId: node.gatewayId, initialHmiId: node.hmiId),
+
           // Per-capability controls
           if (node.capabilitiesConfig.isNotEmpty) ...[
             Card(
-              color: const Color(0xFF161b22),
+              color: context.c.card,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
-                side: const BorderSide(color: Color(0xFF30363d)),
+                side: BorderSide(color: context.c.border),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Capabilities', style: TextStyle(color: Color(0xFFc9d1d9), fontWeight: FontWeight.w600)),
+                    Text('Capabilities', style: TextStyle(color: context.c.text, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 12),
                     ...node.capabilitiesConfig.asMap().entries.map((entry) {
                       final i = entry.key;
@@ -221,17 +227,17 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
           // Fallback for old relay nodes without capabilities
           if (node.capabilitiesConfig.isEmpty && node.deviceType == 3) ...[
             Card(
-              color: const Color(0xFF161b22),
+              color: context.c.card,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
-                side: const BorderSide(color: Color(0xFF30363d)),
+                side: BorderSide(color: context.c.border),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Relay Control', style: TextStyle(color: Color(0xFFc9d1d9), fontWeight: FontWeight.w600)),
+                    Text('Relay Control', style: TextStyle(color: context.c.text, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -239,7 +245,7 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                           child: ElevatedButton(
                             onPressed: _sending ? null : () => _sendCommand(1),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF238636),
+                              backgroundColor: context.c.okStrong,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
@@ -251,7 +257,7 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                           child: ElevatedButton(
                             onPressed: _sending ? null : () => _sendCommand(0),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFda3633),
+                              backgroundColor: context.c.badStrong,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
@@ -281,21 +287,21 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
-                      style: const TextStyle(color: Color(0xFFc9d1d9), fontSize: 14, fontWeight: FontWeight.w600)),
+                      style: TextStyle(color: context.c.text, fontSize: 14, fontWeight: FontWeight.w600)),
                   Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
-                      style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+                      style: TextStyle(color: context.c.muted, fontSize: 12)),
                 ],
               ),
             ),
             ElevatedButton(
               onPressed: _sending ? null : () => _sendCommand((cap.value ?? 0) > 0 ? 0 : 1, pin: cap.pin),
               style: ElevatedButton.styleFrom(
-                backgroundColor: (cap.value ?? 0) > 0 ? const Color(0xFF238636) : const Color(0xFF21262d),
+                backgroundColor: (cap.value ?? 0) > 0 ? context.c.okStrong : context.c.divider,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
               ),
               child: Text((cap.value ?? 0) > 0 ? 'ON' : 'OFF',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                  style: TextStyle(color: (cap.value ?? 0) > 0 ? Colors.white : context.c.text, fontWeight: FontWeight.w600, fontSize: 13)),
             ),
           ],
         ),
@@ -316,14 +322,14 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
-                          style: const TextStyle(color: Color(0xFFc9d1d9), fontSize: 14, fontWeight: FontWeight.w600)),
+                          style: TextStyle(color: context.c.text, fontSize: 14, fontWeight: FontWeight.w600)),
                       Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
-                          style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+                          style: TextStyle(color: context.c.muted, fontSize: 12)),
                     ],
                   ),
                 ),
                 Text('${sliderVal.toInt()}',
-                    style: const TextStyle(color: Color(0xFFc9d1d9), fontWeight: FontWeight.w600, fontSize: 14)),
+                    style: TextStyle(color: context.c.text, fontWeight: FontWeight.w600, fontSize: 14)),
               ],
             ),
             const SizedBox(height: 6),
@@ -332,9 +338,9 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                 trackHeight: 4,
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-                activeTrackColor: const Color(0xFF58a6ff),
-                inactiveTrackColor: const Color(0xFF30363d),
-                thumbColor: const Color(0xFF58a6ff),
+                activeTrackColor: context.c.accent,
+                inactiveTrackColor: context.c.border,
+                thumbColor: context.c.accent,
                 overlayColor: const Color(0x2058a6ff),
               ),
               child: Slider(
@@ -365,14 +371,14 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
-                      style: const TextStyle(color: Color(0xFFc9d1d9), fontSize: 14, fontWeight: FontWeight.w600)),
+                      style: TextStyle(color: context.c.text, fontSize: 14, fontWeight: FontWeight.w600)),
                   Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
-                      style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+                      style: TextStyle(color: context.c.muted, fontSize: 12)),
                 ],
               ),
             ),
             Text('${node.value ?? '—'}',
-                style: const TextStyle(color: Color(0xFF8b949e), fontSize: 14)),
+                style: TextStyle(color: context.c.muted, fontSize: 14)),
           ],
         ),
       );
@@ -388,14 +394,14 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
-                      style: const TextStyle(color: Color(0xFFc9d1d9), fontSize: 14, fontWeight: FontWeight.w600)),
+                      style: TextStyle(color: context.c.text, fontSize: 14, fontWeight: FontWeight.w600)),
                   Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
-                      style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+                      style: TextStyle(color: context.c.muted, fontSize: 12)),
                 ],
               ),
             ),
             Text((node.value ?? 0) > 0 ? 'HIGH' : 'LOW',
-                style: const TextStyle(color: Color(0xFF8b949e), fontSize: 14)),
+                style: TextStyle(color: context.c.muted, fontSize: 14)),
           ],
         ),
       );
@@ -411,14 +417,14 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
-                    style: const TextStyle(color: Color(0xFFc9d1d9), fontSize: 14, fontWeight: FontWeight.w600)),
+                    style: TextStyle(color: context.c.text, fontSize: 14, fontWeight: FontWeight.w600)),
                 Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
-                    style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+                    style: TextStyle(color: context.c.muted, fontSize: 12)),
               ],
             ),
           ),
           Text(cap.value?.toString() ?? '—',
-              style: const TextStyle(color: Color(0xFF8b949e), fontSize: 14)),
+              style: TextStyle(color: context.c.muted, fontSize: 14)),
         ],
       ),
     );
@@ -429,14 +435,14 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF0d1117),
+          color: context.c.bg,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF30363d)),
+          border: Border.all(color: context.c.border),
         ),
         child: Column(
           children: [
-            Text(value, style: const TextStyle(color: Color(0xFFc9d1d9), fontSize: 18, fontWeight: FontWeight.bold)),
-            Text(label, style: const TextStyle(color: Color(0xFF8b949e), fontSize: 10)),
+            Text(value, style: TextStyle(color: context.c.text, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(label, style: TextStyle(color: context.c.muted, fontSize: 10)),
           ],
         ),
       ),

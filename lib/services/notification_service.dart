@@ -53,6 +53,39 @@ class NotificationService {
     } catch (_) {}
   }
 
+  /// A sign-in is waiting for the number shown here (two-step verification).
+  Future<void> showSignInRequest(String code, String where, {bool enabling = false}) async {
+    await init();
+    if (_initFailed) return;
+    final spaced = code.length == 6 ? '${code.substring(0, 3)} ${code.substring(3)}' : code;
+    final androidDetails = AndroidNotificationDetails(
+      'mfa_channel',
+      'Sign-in approvals',
+      channelDescription: 'The number to enter when you sign in to SmartHome with two-step verification',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.message,
+      visibility: NotificationVisibility.public,
+      ticker: 'SmartHome sign-in request',
+    );
+    try {
+      await _plugin.show(
+        7000,
+        enabling ? 'Turn on two-step verification' : 'Sign-in request from $where',
+        enabling
+            ? 'Enter $spaced on the website to continue. Do not share this number.'
+            : 'Open SmartHomes and type the number shown on the sign-in screen to approve. Not you? Tap Deny.',
+        NotificationDetails(android: androidDetails, iOS: const DarwinNotificationDetails()),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> cancelSignInRequest() async {
+    try {
+      await _plugin.cancel(7000);
+    } catch (_) {}
+  }
+
   Future<void> showOnlineNotification(String title, String body) async {
     await init();
     if (_initFailed) return;

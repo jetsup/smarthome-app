@@ -2,8 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
+import '../providers/settings_provider.dart';
 import 'login_screen.dart';
 import 'gateway_detail_screen.dart';
+import '../widgets/app_drawer.dart';
+import '../widgets/mfa_approval_host.dart';
+import 'add_gateway_screen.dart';
+import 'walkthrough_screen.dart';
+import '../theme/app_colors.dart';
 
 class GatewaysScreen extends ConsumerStatefulWidget {
   const GatewaysScreen({super.key});
@@ -19,8 +25,34 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
-    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _poll());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _load();
+      _maybeShowWalkthrough();
+    });
+    _startPolling();
+  }
+
+  // First launch after sign-in: show the tour once.
+  Future<void> _maybeShowWalkthrough() async {
+    if (await walkthroughSeen() || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(fullscreenDialog: true, builder: (_) => const WalkthroughScreen()),
+    );
+    await markWalkthroughSeen();
+  }
+
+  Future<void> _addGateway() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const AddGatewayScreen()),
+    );
+    _load();
+  }
+
+  // Auto-refresh interval comes from Settings (0 = manual only).
+  void _startPolling() {
+    _pollTimer?.cancel();
+    final secs = ref.read(settingsProvider).refreshSeconds;
+    if (secs > 0) _pollTimer = Timer.periodic(Duration(seconds: secs), (_) => _poll());
   }
 
   Future<void> _load() async {
@@ -36,16 +68,21 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
 
     for (final gw in current) {
       final prevOnline = _previousOnline[gw.id] ?? true;
+      final prefs = ref.read(settingsProvider);
       if (prevOnline && !gw.online) {
-        notifications.showOfflineNotification(
-          'Gateway Offline',
-          '${gw.name} is no longer connected.',
-        );
+        if (prefs.notifyOffline) {
+          notifications.showOfflineNotification(
+            'Gateway Offline',
+            '${gw.name} is no longer connected.',
+          );
+        }
       } else if (!prevOnline && gw.online) {
-        notifications.showOnlineNotification(
-          'Gateway Online',
-          '${gw.name} is back online.',
-        );
+        if (prefs.notifyOnline) {
+          notifications.showOnlineNotification(
+            'Gateway Online',
+            '${gw.name} is back online.',
+          );
+        }
       }
       _previousOnline[gw.id] = gw.online;
     }
@@ -92,50 +129,107 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
   Widget build(BuildContext context) {
     final gateways = ref.watch(gatewaysProvider);
     final isLocal = ref.watch(isLocalNetworkProvider);
+    ref.listen(settingsProvider.select((s) => s.refreshSeconds), (_, __) => _startPolling());
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0d1117),
+    return MfaApprovalHost(
+      child: Scaffold(
+      backgroundColor: context.c.bg,
+      drawer: AppDrawer(onLogout: _logout, onRefresh: _load),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF161b22),
-        title: const Text('SmartHomes', style: TextStyle(color: Color(0xFFc9d1d9), fontWeight: FontWeight.bold)),
+        backgroundColor: context.c.card,
+        iconTheme: IconThemeData(color: context.c.text),
+        title: Text('SmartHomes',
+            style: TextStyle(color: context.c.text, fontWeight: FontWeight.bold)),
         actions: [
           Center(
             child: Container(
-              margin: const EdgeInsets.only(right: 8),
+              margin: const EdgeInsets.only(right: 4),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: isLocal
-                    ? const Color(0xFF238636).withValues(alpha: 0.2)
-                    : const Color(0xFFf85149).withValues(alpha: 0.2),
+                    ? context.c.okStrong.withValues(alpha: 0.2)
+                    : context.c.bad.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(isLocal ? Icons.wifi : Icons.cloud, size: 14,
-                      color: isLocal ? const Color(0xFF3fb950) : const Color(0xFFf85149)),
+                      color: isLocal ? context.c.ok : context.c.bad),
                   const SizedBox(width: 4),
                   Text(isLocal ? 'LAN' : 'Remote',
                       style: TextStyle(fontSize: 11,
-                          color: isLocal ? const Color(0xFF3fb950) : const Color(0xFFf85149))),
+                          color: isLocal ? context.c.ok : context.c.bad)),
                 ],
               ),
             ),
           ),
-          IconButton(icon: const Icon(Icons.refresh, color: Color(0xFF8b949e)), onPressed: _load),
-          IconButton(icon: const Icon(Icons.logout, color: Color(0xFF8b949e)), onPressed: _logout),
+          IconButton(
+            tooltip: 'Refresh',
+            icon: Icon(Icons.refresh, color: context.c.muted),
+            onPressed: _load,
+          ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _addGateway,
+        backgroundColor: context.c.primary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add),
+        label: const Text('Add gateway'),
+      ),
       body: gateways.isEmpty
-          ? const Center(child: Text('No gateways', style: TextStyle(color: Color(0xFF8b949e))))
+          ? _EmptyState(onAdd: _addGateway, onRefresh: _load)
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView.builder(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
                 itemCount: gateways.length,
                 itemBuilder: (_, i) => _GatewayCard(gateways[i]),
               ),
             ),
+    ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final VoidCallback onAdd;
+  final Future<void> Function() onRefresh;
+  const _EmptyState({required this.onAdd, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView(
+        padding: const EdgeInsets.all(28),
+        children: [
+          const SizedBox(height: 60),
+          Icon(Icons.router_outlined, size: 72, color: context.c.border),
+          const SizedBox(height: 16),
+          Text('No gateways yet',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.c.text, fontSize: 20, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Text(
+            'Power on a gateway, switch Bluetooth on and tap “Add gateway” — the app finds it and links it to your hub.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: context.c.muted, height: 1.4),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: FilledButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.bluetooth_searching),
+              label: const Text('Find my gateway'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text('Already added one? Pull down to refresh.',
+              textAlign: TextAlign.center, style: TextStyle(color: context.c.faint, fontSize: 12)),
+        ],
+      ),
     );
   }
 }
@@ -147,32 +241,32 @@ class _GatewayCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Card(
-      color: const Color(0xFF161b22),
+      color: context.c.card,
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
-        side: const BorderSide(color: Color(0xFF30363d)),
+        side: BorderSide(color: context.c.border),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         title: Text(gateway.name,
-            style: const TextStyle(color: Color(0xFFc9d1d9), fontWeight: FontWeight.w600, fontSize: 15)),
+            style: TextStyle(color: context.c.text, fontWeight: FontWeight.w600, fontSize: 15)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('ID: ${gateway.id}', style: const TextStyle(color: Color(0xFF8b949e), fontSize: 12)),
+            Text('ID: ${gateway.id}', style: TextStyle(color: context.c.muted, fontSize: 12)),
             const SizedBox(height: 4),
             Row(
               children: [
-                _badge(gateway.online ? 'Online' : 'Offline', gateway.online),
+                _badge(context, gateway.online ? 'Online' : 'Offline', gateway.online),
                 const SizedBox(width: 8),
                 Text('${gateway.nodeCount} nodes (${gateway.onlineNodes} online)',
-                    style: const TextStyle(color: Color(0xFF8b949e), fontSize: 11)),
+                    style: TextStyle(color: context.c.muted, fontSize: 11)),
               ],
             ),
           ],
         ),
-        trailing: const Icon(Icons.chevron_right, color: Color(0xFF484f58)),
+        trailing: Icon(Icons.chevron_right, color: context.c.subtle),
         onTap: () {
           ref.read(selectedGatewayProvider.notifier).state = gateway;
           Navigator.of(context).push(
@@ -183,18 +277,18 @@ class _GatewayCard extends ConsumerWidget {
     );
   }
 
-  Widget _badge(String label, bool online) {
+  Widget _badge(BuildContext context, String label, bool online) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: online
-            ? const Color(0xFF238636).withValues(alpha: 0.2)
-            : const Color(0xFF484f58).withValues(alpha: 0.3),
+            ? context.c.okStrong.withValues(alpha: 0.2)
+            : context.c.subtle.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(label,
           style: TextStyle(fontSize: 11,
-              color: online ? const Color(0xFF3fb950) : const Color(0xFF8b949e),
+              color: online ? context.c.ok : context.c.muted,
               fontWeight: FontWeight.w600)),
     );
   }

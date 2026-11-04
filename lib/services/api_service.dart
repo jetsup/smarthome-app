@@ -138,12 +138,17 @@ class ApiService {
     return prefs.getString('hub_url');
   }
 
-  Future<Response> get(String path, {Map<String, dynamic>? params}) =>
-      _dio.get(path, queryParameters: params);
+  Options? _opts(Map<String, String>? headers) => headers == null ? null : Options(headers: headers);
 
-  Future<Response> post(String path, {dynamic data}) =>
-      _dio.post(path, data: data);
+  Future<Response> get(String path, {Map<String, dynamic>? params, Map<String, String>? headers}) =>
+      _dio.get(path, queryParameters: params, options: _opts(headers));
 
-  Future<Response> delete(String path) =>
-      _dio.delete(path);
+  Future<Response> post(String path, {dynamic data, Map<String, String>? headers}) =>
+      _dio.post(path, data: data, options: _opts(headers));
+
+  Future<Response> put(String path, {dynamic data, Map<String, String>? headers}) =>
+      _dio.put(path, data: data, options: _opts(headers));
+
+  Future<Response> delete(String path, {dynamic data, Map<String, String>? headers}) =>
+      _dio.delete(path, data: data, options: _opts(headers));
 }

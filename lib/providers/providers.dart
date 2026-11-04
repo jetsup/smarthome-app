@@ -3,6 +3,7 @@ import '../models/gateway.dart';
 import '../models/node.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/mfa_service.dart';
 import '../services/connectivity_service.dart';
 import '../services/discovery_service.dart';
 import '../services/notification_service.dart';
@@ -16,6 +17,8 @@ final authServiceProvider = Provider<AuthService>((ref) => AuthService(ref.watch
 final discoveryServiceProvider = Provider<DiscoveryService>((ref) => DiscoveryService());
 
 final notificationServiceProvider = Provider<NotificationService>((ref) => NotificationService());
+
+final mfaServiceProvider = Provider<MfaService>((ref) => MfaService(ref.watch(apiServiceProvider)));
 
 final gatewaysProvider = StateNotifierProvider<GatewaysNotifier, List<Gateway>>((ref) => GatewaysNotifier(ref));
 
