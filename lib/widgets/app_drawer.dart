@@ -34,6 +34,9 @@ class AppDrawer extends ConsumerWidget {
     return Drawer(
       child: SafeArea(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Scrolls on short (landscape) screens; Sign out stays pinned below.
+          Expanded(
+            child: ListView(padding: EdgeInsets.zero, children: [
           // ── Header ──
           Container(
             width: double.infinity,
@@ -92,7 +95,8 @@ class AppDrawer extends ConsumerWidget {
           _item(context, Icons.settings_outlined, 'Settings',
               subtitle: 'Theme, accent colour, alerts',
               onTap: () => _go(context, const SettingsScreen())),
-          const Spacer(),
+            ]),
+          ),
           Divider(color: context.c.divider, height: 1),
           _item(context, Icons.logout, 'Sign out', color: context.c.bad, onTap: () async {
             final ok = await showDialog<bool>(

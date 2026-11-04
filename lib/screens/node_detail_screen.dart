@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/node.dart';
 import '../providers/providers.dart';
+import '../services/api_errors.dart';
 import '../theme/app_colors.dart';
 import '../widgets/node_display_card.dart';
 
@@ -95,6 +96,27 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
         hmiId: node.hmiId,
       );
     }
+  }
+
+  Future<void> _editPins(SmartNode node) async {
+    final result = await showDialog<List<CapabilityConfig>>(
+      context: context,
+      builder: (_) => _EditPinsDialog(initial: node.capabilitiesConfig),
+    );
+    if (result == null || !mounted) return;
+    String msg;
+    try {
+      final r = await ref.read(apiServiceProvider).put('/api/nodes/${node.nodeId}/capabilities',
+          data: {'capabilitiesConfig': result.map((c) => c.toJson()).toList()});
+      final d = r.data is Map ? r.data as Map : {};
+      msg = d['status'] == 'updated_but_offline'
+          ? (d['message'] as String? ?? 'Saved. The node gets the new pins when the gateway is back online.')
+          : 'Pins updated. The node restarts with the new assignment.';
+      await _fetchDetail();
+    } catch (e) {
+      msg = apiError(e, 'Could not change the pins');
+    }
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   String _capTypeLabel(String type) {
@@ -198,7 +220,7 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
           NodeDisplayCard(nodeId: node.nodeId, gatewayId: node.gatewayId, initialHmiId: node.hmiId),
 
           // Per-capability controls
-          if (node.capabilitiesConfig.isNotEmpty) ...[
+          ...[
             Card(
               color: context.c.card,
               shape: RoundedRectangleBorder(
@@ -210,8 +232,18 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Capabilities', style: TextStyle(color: context.c.text, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 12),
+                    Row(children: [
+                      Expanded(child: Text('Capabilities', style: TextStyle(color: context.c.text, fontWeight: FontWeight.w600))),
+                      TextButton.icon(
+                        onPressed: () => _editPins(node),
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Edit pins'),
+                      ),
+                    ]),
+                    const SizedBox(height: 8),
+                    if (node.capabilitiesConfig.isEmpty)
+                      Text('No pins are set for this node yet. Tap “Edit pins” to say what is wired to it (for example a potentiometer on GPIO 34 and an LED on GPIO 25).',
+                          style: TextStyle(color: context.c.muted, fontSize: 13, height: 1.4)),
                     ...node.capabilitiesConfig.asMap().entries.map((entry) {
                       final i = entry.key;
                       final cap = entry.value;
@@ -446,6 +478,140 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+const _pinTypes = <String, String>{
+  'digitalOutput': 'Digital out',
+  'analogOutput': 'Analog out (PWM)',
+  'analogInput': 'Analog in',
+  'digitalInput': 'Digital in',
+  'relay': 'Relay',
+  'i2c': 'I2C',
+  'uart': 'UART',
+};
+
+class _PinRow {
+  String type;
+  final TextEditingController pin;
+  final TextEditingController label;
+  _PinRow(CapabilityConfig c)
+      : type = _pinTypes.containsKey(c.type) ? c.type : 'digitalOutput',
+        pin = TextEditingController(text: '${(c.type == 'i2c' || c.type == 'uart') ? c.extra : c.pin}'),
+        label = TextEditingController(text: c.label);
+}
+
+/// Change which GPIO each capability uses, add or remove capabilities.
+class _EditPinsDialog extends StatefulWidget {
+  final List<CapabilityConfig> initial;
+  const _EditPinsDialog({required this.initial});
+
+  @override
+  State<_EditPinsDialog> createState() => _EditPinsDialogState();
+}
+
+class _EditPinsDialogState extends State<_EditPinsDialog> {
+  late final List<_PinRow> _rows = widget.initial.map(_PinRow.new).toList();
+  String? _error;
+
+  void _save() {
+    final out = <CapabilityConfig>[];
+    final used = <int>{};
+    for (final r in _rows) {
+      final n = int.tryParse(r.pin.text.trim());
+      final io = r.type != 'i2c' && r.type != 'uart';
+      if (n == null || n < 0 || n > (io ? 39 : 127)) {
+        setState(() => _error = 'Enter a valid number for every pin.');
+        return;
+      }
+      if (io && !used.add(n)) {
+        setState(() => _error = 'GPIO $n is used twice.');
+        return;
+      }
+      out.add(CapabilityConfig(type: r.type, pin: io ? n : 0, extra: io ? 0 : n, label: r.label.text.trim()));
+    }
+    if (out.isEmpty) {
+      setState(() => _error = 'Add at least one pin.');
+      return;
+    }
+    Navigator.of(context).pop(out);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return AlertDialog(
+      backgroundColor: c.card,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      title: Text('Edit pins', style: TextStyle(color: c.text, fontSize: 17)),
+      content: SizedBox(
+        width: 520,
+        child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Change which GPIO each part is wired to. The node restarts with the new assignment.',
+                style: TextStyle(color: c.muted, fontSize: 12)),
+            const SizedBox(height: 12),
+            for (var i = 0; i < _rows.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                  Expanded(
+                    flex: 5,
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: _rows[i].type,
+                      dropdownColor: c.card,
+                      decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                      style: TextStyle(color: c.text, fontSize: 13),
+                      items: [for (final e in _pinTypes.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
+                      onChanged: (v) => setState(() => _rows[i].type = v ?? _rows[i].type),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _rows[i].pin,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(color: c.text, fontSize: 13),
+                      decoration: InputDecoration(
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                          labelText: (_rows[i].type == 'i2c' || _rows[i].type == 'uart') ? 'Addr/No.' : 'GPIO'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: TextField(
+                      controller: _rows[i].label,
+                      maxLength: 10,
+                      style: TextStyle(color: c.text, fontSize: 13),
+                      decoration: const InputDecoration(isDense: true, border: OutlineInputBorder(), labelText: 'Label', counterText: ''),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Remove',
+                    icon: Icon(Icons.close, color: c.bad, size: 18),
+                    onPressed: _rows.length > 1 ? () => setState(() => _rows.removeAt(i)) : null,
+                  ),
+                ]),
+              ),
+            if (_rows.length < 8)
+              TextButton.icon(
+                onPressed: () => setState(() => _rows.add(_PinRow(CapabilityConfig(type: 'digitalOutput', pin: 0)))),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Add another'),
+              ),
+            if (_error != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_error!, style: TextStyle(color: c.bad, fontSize: 12))),
+          ]),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        FilledButton(onPressed: _save, child: const Text('Save & apply')),
+      ],
     );
   }
 }

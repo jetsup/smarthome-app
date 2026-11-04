@@ -12,7 +12,10 @@ class DeviceDetails {
   final String os;
   const DeviceDetails(this.manufacturer, this.model, this.os);
 
-  String get name => [manufacturer, model].where((s) => s.isNotEmpty).join(' ');
+  /// "INFINIX Infinix X6855" would repeat the maker, so skip it when the model already has it.
+  String get name => model.toLowerCase().startsWith(manufacturer.toLowerCase())
+      ? model
+      : [manufacturer, model].where((s) => s.isNotEmpty).join(' ');
   String get label => '$name · SmartHomes app';
 }
 
