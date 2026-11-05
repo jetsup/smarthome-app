@@ -58,7 +58,7 @@ const _slides = <_Slide>[
       [
         (Icons.wifi_tethering, 'Menu → Set up HMI Wi-Fi gives a display its Wi-Fi without typing on it'),
         (Icons.qr_code_scanner, 'Menu → Pair a display: scan the QR code it shows and pick its gateway'),
-        (Icons.devices_other, 'My displays lists them all. Open one to choose its nodes'),
+        (Icons.devices_other, 'Displays lists them all. Open one to choose its nodes'),
         (Icons.lock_outline, 'A node appears on one display only — assigning it elsewhere moves it'),
       ]),
   _Slide(Icons.notifications_active_outlined, Color(0xFFf0883e), 'Stay informed',
@@ -71,7 +71,7 @@ const _slides = <_Slide>[
   _Slide(Icons.menu, Color(0xFF58a6ff), 'Everything is in the menu',
       'Tap ☰ (or swipe from the left edge) any time.',
       [
-        (Icons.router_outlined, 'My gateways, Add a gateway, Set up HMI Wi-Fi'),
+        (Icons.router_outlined, 'Gateways, Add a gateway, Set up HMI Wi-Fi'),
         (Icons.tour_outlined, 'Replay this walkthrough whenever you like'),
         (Icons.logout, 'Sign out lives at the bottom'),
       ]),

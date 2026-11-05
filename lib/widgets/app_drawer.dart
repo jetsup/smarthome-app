@@ -79,9 +79,9 @@ class AppDrawer extends ConsumerWidget {
           const SizedBox(height: 8),
 
           _section(context, 'Devices'),
-          _item(context, Icons.router_outlined, 'My gateways', selected: true,
+          _item(context, Icons.router_outlined, 'Gateways', selected: true,
               onTap: () => Navigator.of(context).pop()),
-          _item(context, Icons.tv_outlined, 'My displays',
+          _item(context, Icons.tv_outlined, 'Displays',
               subtitle: 'Paired HMI screens and their nodes',
               onTap: () => _go(context, const DisplaysScreen())),
 

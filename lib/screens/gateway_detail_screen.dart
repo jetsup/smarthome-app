@@ -6,7 +6,9 @@ import '../models/node.dart';
 import 'gateway_settings_screen.dart';
 import 'node_detail_screen.dart';
 import '../services/api_errors.dart';
+import '../services/catalog.dart';
 import '../theme/app_colors.dart';
+import '../widgets/capability_editor.dart';
 
 class GatewayDetailScreen extends ConsumerStatefulWidget {
   final String gatewayId;
@@ -274,10 +276,19 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
     );
   }
 
-  void _showProvisionDialog(int deviceId) {
+  Future<void> _showProvisionDialog(int deviceId) async {
+    CapCatalog catalog;
+    try {
+      catalog = await ref.read(capCatalogProvider.future);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not load the module list. Try again.')));
+      return;
+    }
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (ctx) => _ProvisionDialog(
+        catalog: catalog,
         deviceId: deviceId,
         onProvision: (name, caps) {
           Navigator.of(ctx).pop();
@@ -372,10 +383,11 @@ class _DiscBadge extends StatelessWidget {
 }
 
 class _ProvisionDialog extends StatefulWidget {
+  final CapCatalog catalog;
   final int deviceId;
   final void Function(String name, List<Map<String, dynamic>> caps) onProvision;
 
-  const _ProvisionDialog({required this.deviceId, required this.onProvision});
+  const _ProvisionDialog({required this.catalog, required this.deviceId, required this.onProvision});
 
   @override
   State<_ProvisionDialog> createState() => _ProvisionDialogState();
@@ -383,31 +395,7 @@ class _ProvisionDialog extends StatefulWidget {
 
 class _ProvisionDialogState extends State<_ProvisionDialog> {
   final _nameCtrl = TextEditingController();
-  final List<_CapFormEntry> _caps = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _caps.add(_CapFormEntry());
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    for (final c in _caps) { c.dispose(); }
-    super.dispose();
-  }
-
-  void _addCap() {
-    setState(() => _caps.add(_CapFormEntry()));
-  }
-
-  void _removeCap(int i) {
-    if (_caps.length > 1) {
-      _caps[i].dispose();
-      setState(() => _caps.removeAt(i));
-    }
-  }
+  late final List<CapEntry> _caps = [CapEntry(widget.catalog.of('digitalOutput') ?? widget.catalog.types.first)];
 
   @override
   Widget build(BuildContext context) {
@@ -439,13 +427,7 @@ class _ProvisionDialogState extends State<_ProvisionDialog> {
               const SizedBox(height: 16),
               _fieldLabel('Capabilities'),
               const SizedBox(height: 4),
-              ..._caps.asMap().entries.map((e) => _capRow(e.key)),
-              const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: _addCap,
-                icon: Icon(Icons.add, color: context.c.accent, size: 18),
-                label: Text('Add Capability', style: TextStyle(color: context.c.accent, fontSize: 13)),
-              ),
+              CapabilityEditor(catalog: widget.catalog, entries: _caps),
             ],
           ),
         ),
@@ -464,99 +446,6 @@ class _ProvisionDialogState extends State<_ProvisionDialog> {
           child: const Text('Confirm', style: TextStyle(color: Colors.white)),
         ),
       ],
-    );
-  }
-
-  Widget _capRow(int i) {
-    final c = _caps[i];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 5,
-            child: _darkField(
-              child: DropdownButtonFormField<String>(
-                isExpanded: true,
-                initialValue: c.type,
-                dropdownColor: context.c.bg,
-                style: TextStyle(color: context.c.text, fontSize: 12),
-                decoration: _inputDec(''),
-                items: const [
-                  DropdownMenuItem(value: 'digitalOutput', child: Text('Dig Out')),
-                  DropdownMenuItem(value: 'analogOutput', child: Text('An Out')),
-                  DropdownMenuItem(value: 'analogInput', child: Text('An In')),
-                  DropdownMenuItem(value: 'digitalInput', child: Text('Dig In')),
-                  DropdownMenuItem(value: 'relay', child: Text('Relay')),
-                  DropdownMenuItem(value: 'i2c', child: Text('I2C')),
-                  DropdownMenuItem(value: 'uart', child: Text('UART')),
-                ],
-                onChanged: (v) {
-                  if (v != null) setState(() => c.type = v);
-                },
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          if (c.type != 'i2c' && c.type != 'uart')
-            SizedBox(
-              width: 50,
-              child: _darkField(
-                child: TextField(
-                  controller: c.pinCtrl,
-                  keyboardType: TextInputType.number,
-                  style: TextStyle(color: context.c.text, fontSize: 12),
-                  decoration: _inputDec('Pin'),
-                ),
-              ),
-            ),
-          if (c.type == 'i2c')
-            SizedBox(
-              width: 60,
-              child: _darkField(
-                child: TextField(
-                  controller: c.pinCtrl,
-                  keyboardType: TextInputType.number,
-                  style: TextStyle(color: context.c.text, fontSize: 12),
-                  decoration: _inputDec('Addr'),
-                ),
-              ),
-            ),
-          if (c.type == 'uart')
-            SizedBox(
-              width: 60,
-              child: _darkField(
-                child: TextField(
-                  controller: c.pinCtrl,
-                  keyboardType: TextInputType.number,
-                  style: TextStyle(color: context.c.text, fontSize: 12),
-                  decoration: _inputDec('UART#'),
-                ),
-              ),
-            ),
-          const SizedBox(width: 6),
-          Expanded(
-            flex: 4,
-            child: _darkField(
-              child: TextField(
-                controller: c.labelCtrl,
-                style: TextStyle(color: context.c.text, fontSize: 12),
-                decoration: _inputDec('Label'),
-              ),
-            ),
-          ),
-          if (_caps.length > 1)
-            SizedBox(
-              width: 30,
-              child: IconButton(
-                icon: Icon(Icons.remove_circle_outline, color: context.c.bad, size: 18),
-                onPressed: () => _removeCap(i),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ),
-        ],
-      ),
     );
   }
 
@@ -582,32 +471,6 @@ class _ProvisionDialogState extends State<_ProvisionDialog> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       isDense: true,
     );
-  }
-}
-
-class _CapFormEntry {
-  String type;
-  final TextEditingController pinCtrl;
-  final TextEditingController labelCtrl;
-
-  _CapFormEntry()
-    : type = 'digitalOutput',
-      pinCtrl = TextEditingController(text: '2'),
-      labelCtrl = TextEditingController();
-
-  Map<String, dynamic> toMap() {
-    final isIoType = type != 'i2c' && type != 'uart';
-    return {
-      'type': type,
-      'pin': isIoType ? (int.tryParse(pinCtrl.text) ?? 0) : 0,
-      'extra': !isIoType ? (int.tryParse(pinCtrl.text) ?? 0) : 0,
-      'label': labelCtrl.text,
-    };
-  }
-
-  void dispose() {
-    pinCtrl.dispose();
-    labelCtrl.dispose();
   }
 }
 

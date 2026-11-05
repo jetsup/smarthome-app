@@ -6,6 +6,10 @@ class CapabilityConfig {
   final int extra;
   final String label;
   final int? value;
+  final int count; // NeoPixel LEDs
+  final bool ring; // NeoPixel ring layout
+  final int pin2; // second pin (I2C SCL / UART TX)
+  final String display; // short live state text from the hub
 
   CapabilityConfig({
     required this.type,
@@ -13,6 +17,10 @@ class CapabilityConfig {
     this.extra = 0,
     this.label = '',
     this.value,
+    this.count = 0,
+    this.ring = false,
+    this.pin2 = 0,
+    this.display = '',
   });
 
   factory CapabilityConfig.fromJson(Map<String, dynamic> json) {
@@ -22,6 +30,10 @@ class CapabilityConfig {
       extra: json['extra'] as int? ?? 0,
       label: json['label'] as String? ?? '',
       value: json['value'] as int?,
+      count: json['count'] as int? ?? 0,
+      ring: json['ring'] as bool? ?? false,
+      pin2: json['pin2'] as int? ?? 0,
+      display: json['display'] as String? ?? '',
     );
   }
 
@@ -30,7 +42,30 @@ class CapabilityConfig {
     'pin': pin,
     'extra': extra,
     'label': label,
+    'count': count,
+    'ring': ring,
+    'pin2': pin2,
   };
+}
+
+/// One live sensor value (already scaled to real units by the hub).
+class SensorReading {
+  final int cap;
+  final int channel;
+  final String key;
+  final String label;
+  final String unit;
+  final double value;
+  const SensorReading(this.cap, this.channel, this.key, this.label, this.unit, this.value);
+
+  factory SensorReading.fromJson(Map<String, dynamic> j) => SensorReading(
+        j['cap'] as int? ?? 0,
+        j['channel'] as int? ?? 0,
+        j['key'] as String? ?? '',
+        j['label'] as String? ?? '',
+        j['unit'] as String? ?? '',
+        (j['value'] as num?)?.toDouble() ?? 0,
+      );
 }
 
 class SmartNode {
@@ -47,6 +82,9 @@ class SmartNode {
   final List<CapabilityConfig> capabilitiesConfig;
   /// The one display this node is shown on (null = not assigned to any display).
   final int? hmiId;
+  final List<SensorReading> readings;
+  /// Last action settings per module index (e.g. the NeoPixel pattern in use).
+  final Map<String, Map<String, dynamic>> effects;
 
   SmartNode({
     required this.nodeId,
@@ -61,6 +99,8 @@ class SmartNode {
     this.name = '',
     this.capabilitiesConfig = const [],
     this.hmiId,
+    this.readings = const [],
+    this.effects = const {},
   });
 
   factory SmartNode.fromJson(Map<String, dynamic> json) {
@@ -98,6 +138,11 @@ class SmartNode {
       name: json['name'] as String? ?? '',
       capabilitiesConfig: caps,
       hmiId: json['hmiId'] as int?,
+      readings: ((json['readings'] as List?) ?? const [])
+          .map((e) => SensorReading.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      effects: ((json['effects'] as Map?) ?? const {}).map(
+          (k, v) => MapEntry(k as String, Map<String, dynamic>.from(v as Map))),
     );
   }
 

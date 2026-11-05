@@ -5,6 +5,8 @@ import '../models/node.dart';
 import '../providers/providers.dart';
 import '../services/api_errors.dart';
 import '../theme/app_colors.dart';
+import '../widgets/capability_editor.dart';
+import '../widgets/module_controls.dart';
 import '../widgets/node_display_card.dart';
 
 class NodeDetailScreen extends ConsumerStatefulWidget {
@@ -94,20 +96,26 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
         name: node.name,
         capabilitiesConfig: updated,
         hmiId: node.hmiId,
+        readings: node.readings,
+        effects: node.effects,
       );
     }
   }
 
   Future<void> _editPins(SmartNode node) async {
-    final result = await showDialog<List<CapabilityConfig>>(
-      context: context,
-      builder: (_) => _EditPinsDialog(initial: node.capabilitiesConfig),
-    );
+    List<Map<String, dynamic>>? result;
+    try {
+      result = await showCapabilityDialog(context, ref,
+          title: 'Edit modules', confirmText: 'Save & apply', initial: node.capabilitiesConfig);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not load the module list. Try again.')));
+      return;
+    }
     if (result == null || !mounted) return;
     String msg;
     try {
       final r = await ref.read(apiServiceProvider).put('/api/nodes/${node.nodeId}/capabilities',
-          data: {'capabilitiesConfig': result.map((c) => c.toJson()).toList()});
+          data: {'capabilitiesConfig': result});
       final d = r.data is Map ? r.data as Map : {};
       msg = d['status'] == 'updated_but_offline'
           ? (d['message'] as String? ?? 'Saved. The node gets the new pins when the gateway is back online.')
@@ -128,6 +136,11 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
       'relay': 'Relay',
       'irTx': 'IR TX',
       'irRx': 'IR RX',
+      'neopixel': 'NeoPixel LEDs',
+      'buzzer': 'Buzzer',
+      'dht': 'DHT sensor',
+      'ld2410': 'LD2410 radar',
+      'ds3231': 'DS3231 clock',
       'i2c': 'I2C',
       'uart': 'UART',
     };
@@ -237,12 +250,12 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                       TextButton.icon(
                         onPressed: () => _editPins(node),
                         icon: const Icon(Icons.edit_outlined, size: 18),
-                        label: const Text('Edit pins'),
+                        label: const Text('Edit modules'),
                       ),
                     ]),
                     const SizedBox(height: 8),
                     if (node.capabilitiesConfig.isEmpty)
-                      Text('No pins are set for this node yet. Tap “Edit pins” to say what is wired to it (for example a potentiometer on GPIO 34 and an LED on GPIO 25).',
+                      Text('No modules are set for this node yet. Tap “Edit modules” to say what is wired to it (for example a potentiometer on GPIO 34, an LED on GPIO 25, or a NeoPixel ring).',
                           style: TextStyle(color: context.c.muted, fontSize: 13, height: 1.4)),
                     ...node.capabilitiesConfig.asMap().entries.map((entry) {
                       final i = entry.key;
@@ -255,6 +268,8 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
             ),
             const SizedBox(height: 16),
           ],
+
+          ModuleControls(node: node, onChanged: _fetchDetail),
 
           // Fallback for old relay nodes without capabilities
           if (node.capabilitiesConfig.isEmpty && node.deviceType == 3) ...[
@@ -409,7 +424,7 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                 ],
               ),
             ),
-            Text('${node.value ?? '—'}',
+            Text('${cap.value ?? node.value ?? '—'}',
                 style: TextStyle(color: context.c.muted, fontSize: 14)),
           ],
         ),
@@ -432,7 +447,7 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                 ],
               ),
             ),
-            Text((node.value ?? 0) > 0 ? 'HIGH' : 'LOW',
+            Text(((cap.value ?? node.value) ?? 0) > 0 ? 'HIGH' : 'LOW',
                 style: TextStyle(color: context.c.muted, fontSize: 14)),
           ],
         ),
@@ -450,13 +465,13 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
               children: [
                 Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
                     style: TextStyle(color: context.c.text, fontSize: 14, fontWeight: FontWeight.w600)),
-                Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
+                Text('${_capTypeLabel(cap.type)}${cap.pin > 0 ? ' (pin ${cap.pin})' : ''}${cap.type == 'neopixel' ? ' · ${cap.count} LEDs${cap.ring ? ' · ring' : ''}' : ''}',
                     style: TextStyle(color: context.c.muted, fontSize: 12)),
               ],
             ),
           ),
-          Text(cap.value?.toString() ?? '—',
-              style: TextStyle(color: context.c.muted, fontSize: 14)),
+          Text(cap.display.isNotEmpty ? cap.display : (cap.value?.toString() ?? '—'),
+              style: TextStyle(color: cap.display.isNotEmpty ? context.c.accent : context.c.muted, fontSize: 14, fontWeight: cap.display.isNotEmpty ? FontWeight.w600 : FontWeight.w400)),
         ],
       ),
     );
@@ -478,140 +493,6 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
           ],
         ),
       ),
-    );
-  }
-}
-
-const _pinTypes = <String, String>{
-  'digitalOutput': 'Digital out',
-  'analogOutput': 'Analog out (PWM)',
-  'analogInput': 'Analog in',
-  'digitalInput': 'Digital in',
-  'relay': 'Relay',
-  'i2c': 'I2C',
-  'uart': 'UART',
-};
-
-class _PinRow {
-  String type;
-  final TextEditingController pin;
-  final TextEditingController label;
-  _PinRow(CapabilityConfig c)
-      : type = _pinTypes.containsKey(c.type) ? c.type : 'digitalOutput',
-        pin = TextEditingController(text: '${(c.type == 'i2c' || c.type == 'uart') ? c.extra : c.pin}'),
-        label = TextEditingController(text: c.label);
-}
-
-/// Change which GPIO each capability uses, add or remove capabilities.
-class _EditPinsDialog extends StatefulWidget {
-  final List<CapabilityConfig> initial;
-  const _EditPinsDialog({required this.initial});
-
-  @override
-  State<_EditPinsDialog> createState() => _EditPinsDialogState();
-}
-
-class _EditPinsDialogState extends State<_EditPinsDialog> {
-  late final List<_PinRow> _rows = widget.initial.map(_PinRow.new).toList();
-  String? _error;
-
-  void _save() {
-    final out = <CapabilityConfig>[];
-    final used = <int>{};
-    for (final r in _rows) {
-      final n = int.tryParse(r.pin.text.trim());
-      final io = r.type != 'i2c' && r.type != 'uart';
-      if (n == null || n < 0 || n > (io ? 39 : 127)) {
-        setState(() => _error = 'Enter a valid number for every pin.');
-        return;
-      }
-      if (io && !used.add(n)) {
-        setState(() => _error = 'GPIO $n is used twice.');
-        return;
-      }
-      out.add(CapabilityConfig(type: r.type, pin: io ? n : 0, extra: io ? 0 : n, label: r.label.text.trim()));
-    }
-    if (out.isEmpty) {
-      setState(() => _error = 'Add at least one pin.');
-      return;
-    }
-    Navigator.of(context).pop(out);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.c;
-    return AlertDialog(
-      backgroundColor: c.card,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      title: Text('Edit pins', style: TextStyle(color: c.text, fontSize: 17)),
-      content: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Change which GPIO each part is wired to. The node restarts with the new assignment.',
-                style: TextStyle(color: c.muted, fontSize: 12)),
-            const SizedBox(height: 12),
-            for (var i = 0; i < _rows.length; i++)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                  Expanded(
-                    flex: 5,
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      initialValue: _rows[i].type,
-                      dropdownColor: c.card,
-                      decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-                      style: TextStyle(color: c.text, fontSize: 13),
-                      items: [for (final e in _pinTypes.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
-                      onChanged: (v) => setState(() => _rows[i].type = v ?? _rows[i].type),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: _rows[i].pin,
-                      keyboardType: TextInputType.number,
-                      style: TextStyle(color: c.text, fontSize: 13),
-                      decoration: InputDecoration(
-                          isDense: true,
-                          border: const OutlineInputBorder(),
-                          labelText: (_rows[i].type == 'i2c' || _rows[i].type == 'uart') ? 'Addr/No.' : 'GPIO'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 3,
-                    child: TextField(
-                      controller: _rows[i].label,
-                      maxLength: 10,
-                      style: TextStyle(color: c.text, fontSize: 13),
-                      decoration: const InputDecoration(isDense: true, border: OutlineInputBorder(), labelText: 'Label', counterText: ''),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Remove',
-                    icon: Icon(Icons.close, color: c.bad, size: 18),
-                    onPressed: _rows.length > 1 ? () => setState(() => _rows.removeAt(i)) : null,
-                  ),
-                ]),
-              ),
-            if (_rows.length < 8)
-              TextButton.icon(
-                onPressed: () => setState(() => _rows.add(_PinRow(CapabilityConfig(type: 'digitalOutput', pin: 0)))),
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Add another'),
-              ),
-            if (_error != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_error!, style: TextStyle(color: c.bad, fontSize: 12))),
-          ]),
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        FilledButton(onPressed: _save, child: const Text('Save & apply')),
-      ],
     );
   }
 }
