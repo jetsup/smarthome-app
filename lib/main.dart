@@ -14,8 +14,10 @@ void _applyOrientationPolicy(BuildContext context) {
   if (shortest <= 0) return; // size not known yet; try again next build
   _orientationPolicySet = true;
   if (shortest < 600) {
-    SystemChrome.setPreferredOrientations(
-        [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
   }
 }
 
@@ -67,7 +69,11 @@ class _AvoidSystemBars extends StatelessWidget {
     return ColoredBox(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: Padding(
-        padding: EdgeInsets.only(left: v.left, right: v.right, bottom: v.bottom),
+        padding: EdgeInsets.only(
+          left: v.left,
+          right: v.right,
+          bottom: v.bottom,
+        ),
         child: MediaQuery(
           data: mq.copyWith(
             padding: mq.padding.copyWith(left: 0, right: 0, bottom: 0),

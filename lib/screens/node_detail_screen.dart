@@ -8,11 +8,16 @@ import '../theme/app_colors.dart';
 import '../widgets/capability_editor.dart';
 import '../widgets/module_controls.dart';
 import '../widgets/node_display_card.dart';
+import 'node_settings_screen.dart';
 
 class NodeDetailScreen extends ConsumerStatefulWidget {
   final SmartNode node;
   final String gatewayId;
-  const NodeDetailScreen({super.key, required this.node, required this.gatewayId});
+  const NodeDetailScreen({
+    super.key,
+    required this.node,
+    required this.gatewayId,
+  });
 
   @override
   ConsumerState<NodeDetailScreen> createState() => _NodeDetailScreenState();
@@ -29,7 +34,10 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
   void initState() {
     super.initState();
     _fetchDetail();
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) => _fetchDetail());
+    _pollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _fetchDetail(),
+    );
   }
 
   @override
@@ -44,7 +52,9 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
       final response = await api.get('/api/nodes/${widget.node.nodeId}');
       if (mounted) {
         setState(() {
-          _detailNode = SmartNode.fromJson(response.data as Map<String, dynamic>);
+          _detailNode = SmartNode.fromJson(
+            response.data as Map<String, dynamic>,
+          );
         });
       }
     } catch (_) {}
@@ -58,7 +68,9 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
 
     final nid = widget.node.nodeId;
     if (nid.isNotEmpty) {
-      await ref.read(nodesProvider(widget.gatewayId).notifier).sendCommand(nid, value, pin: pin);
+      await ref
+          .read(nodesProvider(widget.gatewayId).notifier)
+          .sendCommand(nid, value, pin: pin);
       // Fetch actual state from hub to confirm
       _fetchDetail();
     }
@@ -105,26 +117,42 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
   Future<void> _editPins(SmartNode node) async {
     List<Map<String, dynamic>>? result;
     try {
-      result = await showCapabilityDialog(context, ref,
-          title: 'Edit modules', confirmText: 'Save & apply', initial: node.capabilitiesConfig);
+      result = await showCapabilityDialog(
+        context,
+        ref,
+        title: 'Edit modules',
+        confirmText: 'Save & apply',
+        initial: node.capabilitiesConfig,
+      );
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not load the module list. Try again.')));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not load the module list. Try again.'),
+          ),
+        );
       return;
     }
     if (result == null || !mounted) return;
     String msg;
     try {
-      final r = await ref.read(apiServiceProvider).put('/api/nodes/${node.nodeId}/capabilities',
-          data: {'capabilitiesConfig': result});
+      final r = await ref
+          .read(apiServiceProvider)
+          .put(
+            '/api/nodes/${node.nodeId}/capabilities',
+            data: {'capabilitiesConfig': result},
+          );
       final d = r.data is Map ? r.data as Map : {};
       msg = d['status'] == 'updated_but_offline'
-          ? (d['message'] as String? ?? 'Saved. The node gets the new pins when the gateway is back online.')
+          ? (d['message'] as String? ??
+                'Saved. The node gets the new pins when the gateway is back online.')
           : 'Pins updated. The node restarts with the new assignment.';
       await _fetchDetail();
     } catch (e) {
       msg = apiError(e, 'Could not change the pins');
     }
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    if (mounted)
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   String _capTypeLabel(String type) {
@@ -165,7 +193,8 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
     if (types.contains('relay')) return 'Relay';
     if (types.contains('analogOutput')) return 'Analog Output';
     if (types.contains('digitalOutput')) return 'Digital Output';
-    if (types.contains('irTx') || types.contains('irRx')) return 'IR Transceiver';
+    if (types.contains('irTx') || types.contains('irRx'))
+      return 'IR Transceiver';
     return 'Hybrid';
   }
 
@@ -181,8 +210,17 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
           icon: Icon(Icons.arrow_back, color: context.c.muted),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(node.displayName,
-            style: TextStyle(color: context.c.text)),
+        title: Text(node.displayName, style: TextStyle(color: context.c.text)),
+        actions: [
+          IconButton(
+            tooltip: 'Node settings',
+            icon: Icon(Icons.settings, color: context.c.muted),
+            onPressed: () async {
+              await Navigator.of(context).push(MaterialPageRoute(builder: (_) => NodeSettingsScreen(node: node)));
+              if (mounted) _fetchDetail();
+            },
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -200,19 +238,29 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                 children: [
                   Row(
                     children: [
-                      Container(width: 10, height: 10,
+                      Container(
+                        width: 10,
+                        height: 10,
                         decoration: BoxDecoration(
-                          color: node.isOnline ? context.c.ok : context.c.subtle,
+                          color: node.isOnline
+                              ? context.c.ok
+                              : context.c.subtle,
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text(node.isOnline ? 'Online' : 'Offline',
-                          style: TextStyle(
-                              color: node.isOnline ? context.c.ok : context.c.bad,
-                              fontWeight: FontWeight.w600)),
+                      Text(
+                        node.isOnline ? 'Online' : 'Offline',
+                        style: TextStyle(
+                          color: node.isOnline ? context.c.ok : context.c.bad,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       const Spacer(),
-                      Text(_inferTypeLabel(node), style: TextStyle(color: context.c.muted, fontSize: 13)),
+                      Text(
+                        _inferTypeLabel(node),
+                        style: TextStyle(color: context.c.muted, fontSize: 13),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -230,7 +278,11 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
           const SizedBox(height: 16),
 
           // Which display shows this node (a node is on one display only)
-          NodeDisplayCard(nodeId: node.nodeId, gatewayId: node.gatewayId, initialHmiId: node.hmiId),
+          NodeDisplayCard(
+            nodeId: node.nodeId,
+            gatewayId: node.gatewayId,
+            initialHmiId: node.hmiId,
+          ),
 
           // Per-capability controls
           ...[
@@ -245,18 +297,34 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(children: [
-                      Expanded(child: Text('Capabilities', style: TextStyle(color: context.c.text, fontWeight: FontWeight.w600))),
-                      TextButton.icon(
-                        onPressed: () => _editPins(node),
-                        icon: const Icon(Icons.edit_outlined, size: 18),
-                        label: const Text('Edit modules'),
-                      ),
-                    ]),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Capabilities',
+                            style: TextStyle(
+                              color: context.c.text,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => _editPins(node),
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text('Edit modules'),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
                     if (node.capabilitiesConfig.isEmpty)
-                      Text('No modules are set for this node yet. Tap “Edit modules” to say what is wired to it (for example a potentiometer on GPIO 34, an LED on GPIO 25, or a NeoPixel ring).',
-                          style: TextStyle(color: context.c.muted, fontSize: 13, height: 1.4)),
+                      Text(
+                        'No modules are set for this node yet. Tap “Edit modules” to say what is wired to it (for example a potentiometer on GPIO 34, an LED on GPIO 25, or a NeoPixel ring).',
+                        style: TextStyle(
+                          color: context.c.muted,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
                     ...node.capabilitiesConfig.asMap().entries.map((entry) {
                       final i = entry.key;
                       final cap = entry.value;
@@ -284,7 +352,13 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Relay Control', style: TextStyle(color: context.c.text, fontWeight: FontWeight.w600)),
+                    Text(
+                      'Relay Control',
+                      style: TextStyle(
+                        color: context.c.text,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -294,9 +368,17 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: context.c.okStrong,
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
-                            child: const Text('Turn ON', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                            child: const Text(
+                              'Turn ON',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -306,9 +388,17 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: context.c.badStrong,
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
                             ),
-                            child: const Text('Turn OFF', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                            child: const Text(
+                              'Turn OFF',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -323,7 +413,12 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
     );
   }
 
-  Widget _capabilityTile(BuildContext context, SmartNode node, int index, CapabilityConfig cap) {
+  Widget _capabilityTile(
+    BuildContext context,
+    SmartNode node,
+    int index,
+    CapabilityConfig cap,
+  ) {
     if (cap.type == 'digitalOutput' || cap.type == 'relay') {
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
@@ -333,22 +428,48 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
-                      style: TextStyle(color: context.c.text, fontSize: 14, fontWeight: FontWeight.w600)),
-                  Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
-                      style: TextStyle(color: context.c.muted, fontSize: 12)),
+                  Text(
+                    cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
+                    style: TextStyle(
+                      color: context.c.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '${_capTypeLabel(cap.type)} (pin ${cap.pin})',
+                    style: TextStyle(color: context.c.muted, fontSize: 12),
+                  ),
                 ],
               ),
             ),
             ElevatedButton(
-              onPressed: _sending ? null : () => _sendCommand((cap.value ?? 0) > 0 ? 0 : 1, pin: cap.pin),
+              onPressed: _sending
+                  ? null
+                  : () => _sendCommand(
+                      (cap.value ?? 0) > 0 ? 0 : 1,
+                      pin: cap.pin,
+                    ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: (cap.value ?? 0) > 0 ? context.c.okStrong : context.c.divider,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                backgroundColor: (cap.value ?? 0) > 0
+                    ? context.c.okStrong
+                    : context.c.divider,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
               ),
-              child: Text((cap.value ?? 0) > 0 ? 'ON' : 'OFF',
-                  style: TextStyle(color: (cap.value ?? 0) > 0 ? Colors.white : context.c.text, fontWeight: FontWeight.w600, fontSize: 13)),
+              child: Text(
+                (cap.value ?? 0) > 0 ? 'ON' : 'OFF',
+                style: TextStyle(
+                  color: (cap.value ?? 0) > 0 ? Colors.white : context.c.text,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
             ),
           ],
         ),
@@ -356,7 +477,9 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
     }
 
     if (cap.type == 'analogOutput') {
-      final sliderVal = _dragIndex == index ? _dragValue : (cap.value?.toDouble() ?? 0);
+      final sliderVal = _dragIndex == index
+          ? _dragValue
+          : (cap.value?.toDouble() ?? 0);
       return Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Column(
@@ -368,15 +491,31 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
-                          style: TextStyle(color: context.c.text, fontSize: 14, fontWeight: FontWeight.w600)),
-                      Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
-                          style: TextStyle(color: context.c.muted, fontSize: 12)),
+                      Text(
+                        cap.label.isNotEmpty
+                            ? cap.label
+                            : _capTypeLabel(cap.type),
+                        style: TextStyle(
+                          color: context.c.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${_capTypeLabel(cap.type)} (pin ${cap.pin})',
+                        style: TextStyle(color: context.c.muted, fontSize: 12),
+                      ),
                     ],
                   ),
                 ),
-                Text('${sliderVal.toInt()}',
-                    style: TextStyle(color: context.c.text, fontWeight: FontWeight.w600, fontSize: 14)),
+                Text(
+                  '${sliderVal.toInt()}',
+                  style: TextStyle(
+                    color: context.c.text,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -395,7 +534,10 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
                 max: 255,
                 divisions: 255,
                 value: sliderVal,
-                onChanged: (v) => setState(() { _dragIndex = index; _dragValue = v; }),
+                onChanged: (v) => setState(() {
+                  _dragIndex = index;
+                  _dragValue = v;
+                }),
                 onChangeEnd: (v) {
                   setState(() => _dragIndex = null);
                   _sendCommand(v.toInt(), pin: cap.pin);
@@ -417,15 +559,25 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
-                      style: TextStyle(color: context.c.text, fontSize: 14, fontWeight: FontWeight.w600)),
-                  Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
-                      style: TextStyle(color: context.c.muted, fontSize: 12)),
+                  Text(
+                    cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
+                    style: TextStyle(
+                      color: context.c.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '${_capTypeLabel(cap.type)} (pin ${cap.pin})',
+                    style: TextStyle(color: context.c.muted, fontSize: 12),
+                  ),
                 ],
               ),
             ),
-            Text('${cap.value ?? node.value ?? '—'}',
-                style: TextStyle(color: context.c.muted, fontSize: 14)),
+            Text(
+              '${cap.value ?? node.value ?? '—'}',
+              style: TextStyle(color: context.c.muted, fontSize: 14),
+            ),
           ],
         ),
       );
@@ -440,15 +592,25 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
-                      style: TextStyle(color: context.c.text, fontSize: 14, fontWeight: FontWeight.w600)),
-                  Text('${_capTypeLabel(cap.type)} (pin ${cap.pin})',
-                      style: TextStyle(color: context.c.muted, fontSize: 12)),
+                  Text(
+                    cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
+                    style: TextStyle(
+                      color: context.c.text,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '${_capTypeLabel(cap.type)} (pin ${cap.pin})',
+                    style: TextStyle(color: context.c.muted, fontSize: 12),
+                  ),
                 ],
               ),
             ),
-            Text(((cap.value ?? node.value) ?? 0) > 0 ? 'HIGH' : 'LOW',
-                style: TextStyle(color: context.c.muted, fontSize: 14)),
+            Text(
+              ((cap.value ?? node.value) ?? 0) > 0 ? 'HIGH' : 'LOW',
+              style: TextStyle(color: context.c.muted, fontSize: 14),
+            ),
           ],
         ),
       );
@@ -463,15 +625,35 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
-                    style: TextStyle(color: context.c.text, fontSize: 14, fontWeight: FontWeight.w600)),
-                Text('${_capTypeLabel(cap.type)}${cap.pin > 0 ? ' (pin ${cap.pin})' : ''}${cap.type == 'neopixel' ? ' · ${cap.count} LEDs${cap.ring ? ' · ring' : ''}' : ''}',
-                    style: TextStyle(color: context.c.muted, fontSize: 12)),
+                Text(
+                  cap.label.isNotEmpty ? cap.label : _capTypeLabel(cap.type),
+                  style: TextStyle(
+                    color: context.c.text,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  '${_capTypeLabel(cap.type)}${cap.pin > 0 ? ' (pin ${cap.pin})' : ''}${cap.type == 'neopixel' ? ' · ${cap.count} LEDs${cap.ring ? ' · ring' : ''}' : ''}',
+                  style: TextStyle(color: context.c.muted, fontSize: 12),
+                ),
               ],
             ),
           ),
-          Text(cap.display.isNotEmpty ? cap.display : (cap.value?.toString() ?? '—'),
-              style: TextStyle(color: cap.display.isNotEmpty ? context.c.accent : context.c.muted, fontSize: 14, fontWeight: cap.display.isNotEmpty ? FontWeight.w600 : FontWeight.w400)),
+          Text(
+            cap.display.isNotEmpty
+                ? cap.display
+                : (cap.value?.toString() ?? '—'),
+            style: TextStyle(
+              color: cap.display.isNotEmpty
+                  ? context.c.accent
+                  : context.c.muted,
+              fontSize: 14,
+              fontWeight: cap.display.isNotEmpty
+                  ? FontWeight.w600
+                  : FontWeight.w400,
+            ),
+          ),
         ],
       ),
     );
@@ -488,7 +670,14 @@ class _NodeDetailScreenState extends ConsumerState<NodeDetailScreen> {
         ),
         child: Column(
           children: [
-            Text(value, style: TextStyle(color: context.c.text, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: TextStyle(
+                color: context.c.text,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             Text(label, style: TextStyle(color: context.c.muted, fontSize: 10)),
           ],
         ),

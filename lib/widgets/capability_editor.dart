@@ -186,6 +186,7 @@ Future<List<Map<String, dynamic>>?> showCapabilityDialog(
   if (!context.mounted) return null;
   return showDialog<List<Map<String, dynamic>>>(
     context: context,
+    barrierDismissible: false,
     builder: (ctx) => AlertDialog(
       backgroundColor: ctx.c.card,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),

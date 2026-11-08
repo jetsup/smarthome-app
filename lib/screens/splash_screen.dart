@@ -26,9 +26,10 @@ class SplashScreen extends ConsumerStatefulWidget {
 
 class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
-
-  late final AnimationController _pulse =
-      AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 2),
+  )..repeat();
 
   final _steps = <_Step>[
     _Step('Notifications'),
@@ -72,9 +73,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     // Request notification permission first — required for app function
     if (Platform.isAndroid) {
       ref.read(splashStateProvider.notifier).state = SplashState.permission;
-      _set(0, _S.active,
-          detail: 'Needed to alert you when a gateway goes offline',
-          headline: 'Checking notification permission…');
+      _set(
+        0,
+        _S.active,
+        detail: 'Needed to alert you when a gateway goes offline',
+        headline: 'Checking notification permission…',
+      );
       final notif = ref.read(notificationServiceProvider);
       bool granted = await notif.requestPermission();
       while (!granted) {
@@ -104,8 +108,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
           break;
         }
       }
-      _set(0, granted ? _S.done : _S.failed,
-          detail: granted ? null : 'Not granted — you will not get offline alerts');
+      _set(
+        0,
+        granted ? _S.done : _S.failed,
+        detail: granted
+            ? null
+            : 'Not granted — you will not get offline alerts',
+      );
       await _pace();
     } else {
       _set(0, _S.skipped);
@@ -116,26 +125,43 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
       _set(1, _S.active, headline: 'Restoring your saved session…');
       final api = ref.read(apiServiceProvider);
-      try { await api.loadToken(); } catch (_) {}
-      try { await api.loadCredentials(); } catch (_) {}
+      try {
+        await api.loadToken();
+      } catch (_) {}
+      try {
+        await api.loadCredentials();
+      } catch (_) {}
       String? savedUrl;
-      try { savedUrl = await api.loadHubUrl(); } catch (_) {}
+      try {
+        savedUrl = await api.loadHubUrl();
+      } catch (_) {}
 
       if (savedUrl != null) {
         api.setBaseUrl(savedUrl);
       }
       final host = savedUrl == null ? null : Uri.tryParse(savedUrl)?.host;
-      _set(1, _S.done,
-          detail: host == null ? 'No saved hub yet' : 'Hub: $host');
+      _set(
+        1,
+        _S.done,
+        detail: host == null ? 'No saved hub yet' : 'Hub: $host',
+      );
       await _pace();
 
       if (api.hasToken && api.hasBaseUrl) {
-        _set(2, _S.active,
-            detail: 'Checking your saved login with $host',
-            headline: 'Signing you in…');
+        _set(
+          2,
+          _S.active,
+          detail: 'Checking your saved login with $host',
+          headline: 'Signing you in…',
+        );
         final ok = await ref.read(authServiceProvider).verifyToken();
         if (ok) {
-          _set(2, _S.done, detail: 'Welcome back', headline: 'Loading your gateways…');
+          _set(
+            2,
+            _S.done,
+            detail: 'Welcome back',
+            headline: 'Loading your gateways…',
+          );
           _set(3, _S.skipped);
           await _pace();
           if (mounted) _navigateToGateways();
@@ -144,12 +170,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       }
 
       if (api.hasCredentials && api.hasBaseUrl) {
-        _set(2, _S.active,
-            detail: 'Saved login expired — signing in again',
-            headline: 'Signing you in…');
+        _set(
+          2,
+          _S.active,
+          detail: 'Saved login expired — signing in again',
+          headline: 'Signing you in…',
+        );
         final ok = await ref.read(authServiceProvider).trySilentLogin();
         if (ok) {
-          _set(2, _S.done, detail: 'Welcome back', headline: 'Loading your gateways…');
+          _set(
+            2,
+            _S.done,
+            detail: 'Welcome back',
+            headline: 'Loading your gateways…',
+          );
           _set(3, _S.skipped);
           await _pace();
           if (mounted) _navigateToGateways();
@@ -160,20 +194,31 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         _set(2, _S.skipped, detail: 'Nothing saved to sign in with');
       }
 
-      _set(3, _S.active,
-          detail: 'Listening on your Wi-Fi for a SmartHome hub',
-          headline: 'Looking for your hub on this network…');
+      _set(
+        3,
+        _S.active,
+        detail: 'Listening on your Wi-Fi for a SmartHome hub',
+        headline: 'Looking for your hub on this network…',
+      );
       final discovery = ref.read(discoveryServiceProvider);
       final results = <Gateway>[];
 
       try {
-        await for (final gw in discovery.discoverGateways(timeout: const Duration(seconds: 6))) {
+        await for (final gw in discovery.discoverGateways(
+          timeout: const Duration(seconds: 6),
+        )) {
           results.add(gw);
           if (mounted) {
-            ref.read(discoveryResultsProvider.notifier).state = List.from(results);
+            ref.read(discoveryResultsProvider.notifier).state = List.from(
+              results,
+            );
             ref.read(splashStateProvider.notifier).state = SplashState.found;
-            _set(3, _S.active,
-                detail: 'Found ${results.length} gateway${results.length > 1 ? 's' : ''}: ${gw.name}');
+            _set(
+              3,
+              _S.active,
+              detail:
+                  'Found ${results.length} gateway${results.length > 1 ? 's' : ''}: ${gw.name}',
+            );
           }
         }
       } catch (_) {}
@@ -183,31 +228,51 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       if (results.isNotEmpty) {
         const hubUrl = kDefaultHubUrl;
         api.setBaseUrl(hubUrl);
-        try { await api.saveHubUrl(hubUrl); } catch (_) {}
+        try {
+          await api.saveHubUrl(hubUrl);
+        } catch (_) {}
         ref.read(isLocalNetworkProvider.notifier).state = true;
-        _set(3, _S.done,
-            detail: 'Found ${results.length} gateway${results.length > 1 ? 's' : ''} on your network',
-            headline: 'Connecting to your hub…');
+        _set(
+          3,
+          _S.done,
+          detail:
+              'Found ${results.length} gateway${results.length > 1 ? 's' : ''} on your network',
+          headline: 'Connecting to your hub…',
+        );
         if (api.hasCredentials) {
-          try { await ref.read(authServiceProvider).trySilentLogin(); } catch (_) {}
+          try {
+            await ref.read(authServiceProvider).trySilentLogin();
+          } catch (_) {}
         }
         if (mounted) _navigateToGateways();
       } else if (api.hasToken && api.hasBaseUrl) {
-        _set(3, _S.skipped, detail: 'Using your saved hub', headline: 'Opening your gateways…');
+        _set(
+          3,
+          _S.skipped,
+          detail: 'Using your saved hub',
+          headline: 'Opening your gateways…',
+        );
         if (mounted) _navigateToGateways();
       } else {
         ref.read(splashStateProvider.notifier).state = SplashState.notFound;
-        _set(3, _S.failed,
-            detail: 'No hub found on this Wi-Fi',
-            headline: 'Taking you to sign in…');
+        _set(
+          3,
+          _S.failed,
+          detail: 'No hub found on this Wi-Fi',
+          headline: 'Taking you to sign in…',
+        );
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) _navigateToLogin();
       }
     } catch (e) {
       ref.read(splashStateProvider.notifier).state = SplashState.error;
       final active = _steps.indexWhere((s) => s.status == _S.active);
-      _set(active < 0 ? 2 : active, _S.failed,
-          detail: 'Something went wrong', headline: 'Taking you to sign in…');
+      _set(
+        active < 0 ? 2 : active,
+        _S.failed,
+        detail: 'Something went wrong',
+        headline: 'Taking you to sign in…',
+      );
       if (mounted) {
         await Future.delayed(const Duration(seconds: 3));
         _navigateToLogin();
@@ -226,15 +291,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Future<void> _navigateToLogin() async {
     await _holdMin();
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   @override
   void dispose() {
     _pulse.dispose();
-    try { ref.read(discoveryServiceProvider).stop(); } catch (_) {}
+    try {
+      ref.read(discoveryServiceProvider).stop();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -245,11 +312,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       height: 180,
       child: AnimatedBuilder(
         animation: _pulse,
-        builder: (_, __) => Stack(alignment: Alignment.center, children: [
-          for (final phase in const [0.0, 0.5])
-            _ring((_pulse.value + phase) % 1.0),
-          Image.asset('assets/logo.png', width: 104, height: 104, filterQuality: FilterQuality.high),
-        ]),
+        builder: (_, __) => Stack(
+          alignment: Alignment.center,
+          children: [
+            for (final phase in const [0.0, 0.5])
+              _ring((_pulse.value + phase) % 1.0),
+            Image.asset(
+              'assets/logo.png',
+              width: 104,
+              height: 104,
+              filterQuality: FilterQuality.high,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -261,7 +336,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: context.c.accent.withValues(alpha: (1 - t) * 0.5), width: 2),
+        border: Border.all(
+          color: context.c.accent.withValues(alpha: (1 - t) * 0.5),
+          width: 2,
+        ),
       ),
     );
   }
@@ -270,49 +348,71 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     final Widget icon;
     switch (s.status) {
       case _S.pending:
-        icon = Icon(Icons.radio_button_unchecked, size: 20, color: context.c.border);
+        icon = Icon(
+          Icons.radio_button_unchecked,
+          size: 20,
+          color: context.c.border,
+        );
       case _S.active:
         icon = SizedBox(
-          width: 20, height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2.5, color: context.c.accent),
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: context.c.accent,
+          ),
         );
       case _S.done:
         icon = Icon(Icons.check_circle, size: 20, color: context.c.ok);
       case _S.skipped:
-        icon = Icon(Icons.remove_circle_outline, size: 20, color: context.c.subtle);
+        icon = Icon(
+          Icons.remove_circle_outline,
+          size: 20,
+          color: context.c.subtle,
+        );
       case _S.failed:
         icon = Icon(Icons.error, size: 20, color: context.c.bad);
     }
     final dim = s.status == _S.pending || s.status == _S.skipped;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(padding: const EdgeInsets.only(top: 1), child: icon),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              s.label,
-              style: TextStyle(
-                color: dim ? context.c.subtle : context.c.text,
-                fontWeight: s.status == _S.active ? FontWeight.w600 : FontWeight.normal,
-                fontSize: 14,
-              ),
-            ),
-            if (s.detail != null && s.status != _S.pending)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  s.detail!,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(padding: const EdgeInsets.only(top: 1), child: icon),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  s.label,
                   style: TextStyle(
-                    color: s.status == _S.failed ? context.c.bad : context.c.muted,
-                    fontSize: 12,
+                    color: dim ? context.c.subtle : context.c.text,
+                    fontWeight: s.status == _S.active
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    fontSize: 14,
                   ),
                 ),
-              ),
-          ]),
-        ),
-      ]),
+                if (s.detail != null && s.status != _S.pending)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      s.detail!,
+                      style: TextStyle(
+                        color: s.status == _S.failed
+                            ? context.c.bad
+                            : context.c.muted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -330,51 +430,73 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: Column(children: [
-              const Spacer(flex: 2),
-              _logo(),
-              const SizedBox(height: 8),
-              Text('SmartHomes',
+            child: Column(
+              children: [
+                const Spacer(flex: 2),
+                _logo(),
+                const SizedBox(height: 8),
+                Text(
+                  'SmartHomes',
                   style: TextStyle(
-                      color: context.c.text, fontSize: 30, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-              const SizedBox(height: 6),
-              Text('Control every gateway and node, anywhere',
-                  style: TextStyle(color: context.c.muted, fontSize: 13)),
-              const Spacer(),
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 360),
-                // Old text fully fades out before the new one fades in (no overlap).
-                switchInCurve: const Interval(0.5, 1.0, curve: Curves.easeIn),
-                switchOutCurve: const Interval(0.5, 1.0, curve: Curves.easeOut),
-                child: Text(
-                  _headline,
-                  key: ValueKey(_headline),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: context.c.text, fontSize: 16, fontWeight: FontWeight.w600),
+                    color: context.c.text,
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: context.c.card.withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: context.c.border),
+                const SizedBox(height: 6),
+                Text(
+                  'Control every gateway and node, anywhere',
+                  style: TextStyle(color: context.c.muted, fontSize: 13),
                 ),
-                child: Column(children: [for (final s in _steps) _stepRow(s)]),
-              ),
-              const SizedBox(height: 20),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  minHeight: 4,
-                  color: context.c.accent,
-                  backgroundColor: context.c.divider,
+                const Spacer(),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 360),
+                  // Old text fully fades out before the new one fades in (no overlap).
+                  switchInCurve: const Interval(0.5, 1.0, curve: Curves.easeIn),
+                  switchOutCurve: const Interval(
+                    0.5,
+                    1.0,
+                    curve: Curves.easeOut,
+                  ),
+                  child: Text(
+                    _headline,
+                    key: ValueKey(_headline),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: context.c.text,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
-              ),
-              const Spacer(),
-            ]),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: context.c.card.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: context.c.border),
+                  ),
+                  child: Column(
+                    children: [for (final s in _steps) _stepRow(s)],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    minHeight: 4,
+                    color: context.c.accent,
+                    backgroundColor: context.c.divider,
+                  ),
+                ),
+                const Spacer(),
+              ],
+            ),
           ),
         ),
       ),

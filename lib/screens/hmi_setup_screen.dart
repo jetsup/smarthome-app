@@ -23,9 +23,10 @@ class HmiSetupScreen extends StatefulWidget {
 enum _Step { scan, connecting, pick, sending, done }
 
 class _HmiSetupScreenState extends State<HmiSetupScreen> {
-
   final _svc = HmiProvisioningService();
-  final _scanner = MobileScannerController(formats: const [BarcodeFormat.qrCode]);
+  final _scanner = MobileScannerController(
+    formats: const [BarcodeFormat.qrCode],
+  );
   final _ssidCtl = TextEditingController();
   final _passCtl = TextEditingController();
   final _nameCtl = TextEditingController();
@@ -128,7 +129,8 @@ class _HmiSetupScreenState extends State<HmiSetupScreen> {
       case HmiWifiState.failed:
         setState(() {
           _step = _Step.pick;
-          _error = 'The HMI could not connect: ${s.detail}. Nothing was saved — check the password and try again.';
+          _error =
+              'The HMI could not connect: ${s.detail}. Nothing was saved — check the password and try again.';
         });
       case HmiWifiState.idle:
         break;
@@ -147,7 +149,11 @@ class _HmiSetupScreenState extends State<HmiSetupScreen> {
       _error = null;
     });
     try {
-      await _svc.sendCredentials(ssid: ssid, password: _passCtl.text, code: _hmi!.code);
+      await _svc.sendCredentials(
+        ssid: ssid,
+        password: _passCtl.text,
+        code: _hmi!.code,
+      );
     } catch (e) {
       setState(() {
         _step = _Step.pick;
@@ -163,8 +169,10 @@ class _HmiSetupScreenState extends State<HmiSetupScreen> {
       appBar: AppBar(
         backgroundColor: context.c.card,
         iconTheme: IconThemeData(color: context.c.text),
-        title: Text('Set up HMI Wi-Fi',
-            style: TextStyle(color: context.c.text, fontWeight: FontWeight.bold)),
+        title: Text(
+          'Set up HMI Wi-Fi',
+          style: TextStyle(color: context.c.text, fontWeight: FontWeight.bold),
+        ),
       ),
       body: SafeArea(child: _body()),
     );
@@ -186,15 +194,22 @@ class _HmiSetupScreenState extends State<HmiSetupScreen> {
   }
 
   Widget _busy(String msg) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          CircularProgressIndicator(color: context.c.accent2),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(msg, textAlign: TextAlign.center, style: TextStyle(color: context.c.text)),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircularProgressIndicator(color: context.c.accent2),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            msg,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: context.c.text),
           ),
-        ]),
-      );
+        ),
+      ],
+    ),
+  );
 
   Widget _errorBox() => _error == null
       ? const SizedBox.shrink()
@@ -210,71 +225,91 @@ class _HmiSetupScreenState extends State<HmiSetupScreen> {
 
   Widget _scanBody() {
     if (_manualEntry) {
-      return ListView(padding: const EdgeInsets.all(16), children: [
-        if (_btOff) const BluetoothOffCard(what: 'displays'),
-        _errorBox(),
-        Text('Type what the HMI shows under the QR code.',
-            style: TextStyle(color: context.c.muted)),
-        const SizedBox(height: 12),
-        _field(_nameCtl, 'HMI name (SmartHome-HMI-XXXX)'),
-        _field(_codeCtl, '6-digit code', keyboard: TextInputType.number),
-        const SizedBox(height: 8),
-        FilledButton(
-          onPressed: () {
-            final n = _nameCtl.text.trim(), k = _codeCtl.text.trim();
-            if (n.isEmpty || k.isEmpty) {
-              setState(() => _error = 'Enter both the name and the code.');
-              return;
-            }
-            _begin(HmiQr(n, k));
-          },
-          child: const Text('Connect'),
-        ),
-        TextButton(
-          onPressed: () => setState(() => _manualEntry = false),
-          child: const Text('Scan the QR code instead'),
-        ),
-      ]);
-    }
-    return Column(children: [
-      Expanded(
-        child: Stack(children: [
-          MobileScanner(controller: _scanner, onDetect: _onQr),
-          Positioned(
-            left: 16, right: 16, top: 16,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.65),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'On the HMI choose “Scan with the SmartHome app”, then point the camera at the QR code.',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ),
-        ]),
-      ),
-      Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(children: [
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
           if (_btOff) const BluetoothOffCard(what: 'displays'),
           _errorBox(),
-          TextButton(
-            onPressed: () => setState(() {
-              _manualEntry = true;
-              _error = null;
-            }),
-            child: const Text('Camera not working? Enter the code manually'),
+          Text(
+            'Type what the HMI shows under the QR code.',
+            style: TextStyle(color: context.c.muted),
           ),
-        ]),
-      ),
-    ]);
+          const SizedBox(height: 12),
+          _field(_nameCtl, 'HMI name (SmartHome-HMI-XXXX)'),
+          _field(_codeCtl, '6-digit code', keyboard: TextInputType.number),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: () {
+              final n = _nameCtl.text.trim(), k = _codeCtl.text.trim();
+              if (n.isEmpty || k.isEmpty) {
+                setState(() => _error = 'Enter both the name and the code.');
+                return;
+              }
+              _begin(HmiQr(n, k));
+            },
+            child: const Text('Connect'),
+          ),
+          TextButton(
+            onPressed: () => setState(() => _manualEntry = false),
+            child: const Text('Scan the QR code instead'),
+          ),
+        ],
+      );
+    }
+    return Column(
+      children: [
+        Expanded(
+          child: Stack(
+            children: [
+              MobileScanner(controller: _scanner, onDetect: _onQr),
+              Positioned(
+                left: 16,
+                right: 16,
+                top: 16,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'On the HMI choose “Scan with the SmartHome app”, then point the camera at the QR code.',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              if (_btOff) const BluetoothOffCard(what: 'displays'),
+              _errorBox(),
+              TextButton(
+                onPressed: () => setState(() {
+                  _manualEntry = true;
+                  _error = null;
+                }),
+                child: const Text(
+                  'Camera not working? Enter the code manually',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
-  Widget _field(TextEditingController c, String hint,
-      {bool obscure = false, TextInputType? keyboard, Widget? suffix}) {
+  Widget _field(
+    TextEditingController c,
+    String hint, {
+    bool obscure = false,
+    TextInputType? keyboard,
+    Widget? suffix,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
@@ -291,57 +326,76 @@ class _HmiSetupScreenState extends State<HmiSetupScreen> {
           fillColor: context.c.card,
           suffixIcon: suffix,
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: context.c.border)),
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: context.c.border),
+          ),
           focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: context.c.accent2)),
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: context.c.accent2),
+          ),
         ),
       ),
     );
   }
 
   Widget _pickBody() {
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      _errorBox(),
-      Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Text('Connected to ${_hmi?.bleName}. Choose the Wi-Fi it should join.',
-            style: TextStyle(color: context.c.muted)),
-      ),
-      WifiPicker(
-        networks: _networks,
-        scanning: _scanningWifi,
-        onRefresh: _refreshWifi,
-        ssidCtl: _ssidCtl,
-        passCtl: _passCtl,
-        showPass: _showPass,
-        onTogglePass: () => setState(() => _showPass = !_showPass),
-        onSelectionChanged: () => setState(() {}),
-        onSubmit: _send,
-        submitLabel: 'Send to HMI',
-        helper: 'The HMI tests the network first and only saves it if it connects, so a typo will not lock it out.',
-      ),
-    ]);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _errorBox(),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            'Connected to ${_hmi?.bleName}. Choose the Wi-Fi it should join.',
+            style: TextStyle(color: context.c.muted),
+          ),
+        ),
+        WifiPicker(
+          networks: _networks,
+          scanning: _scanningWifi,
+          onRefresh: _refreshWifi,
+          ssidCtl: _ssidCtl,
+          passCtl: _passCtl,
+          showPass: _showPass,
+          onTogglePass: () => setState(() => _showPass = !_showPass),
+          onSelectionChanged: () => setState(() {}),
+          onSubmit: _send,
+          submitLabel: 'Send to HMI',
+          helper:
+              'The HMI tests the network first and only saves it if it connects, so a typo will not lock it out.',
+        ),
+      ],
+    );
   }
 
   Widget _doneBody() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.check_circle, color: context.c.ok, size: 72),
-            const SizedBox(height: 16),
-            Text('HMI connected to Wi-Fi',
-                style: TextStyle(color: context.c.text, fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text('Network “${_ssidCtl.text}” · $_ip',
-                style: TextStyle(color: context.c.muted)),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Done'),
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle, color: context.c.ok, size: 72),
+          const SizedBox(height: 16),
+          Text(
+            'HMI connected to Wi-Fi',
+            style: TextStyle(
+              color: context.c.text,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
-          ]),
-        ),
-      );
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Network “${_ssidCtl.text}” · $_ip',
+            style: TextStyle(color: context.c.muted),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    ),
+  );
 }

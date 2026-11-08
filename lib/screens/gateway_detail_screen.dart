@@ -15,7 +15,8 @@ class GatewayDetailScreen extends ConsumerStatefulWidget {
   const GatewayDetailScreen({super.key, required this.gatewayId});
 
   @override
-  ConsumerState<GatewayDetailScreen> createState() => _GatewayDetailScreenState();
+  ConsumerState<GatewayDetailScreen> createState() =>
+      _GatewayDetailScreenState();
 }
 
 class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
@@ -60,7 +61,10 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
       _previousOnline[n.deviceId] = n.isOnline;
     }
 
-    final gw = ref.read(gatewaysProvider).where((g) => g.id == widget.gatewayId).firstOrNull;
+    final gw = ref
+        .read(gatewaysProvider)
+        .where((g) => g.id == widget.gatewayId)
+        .firstOrNull;
     if (gw != null) {
       _pollGw(gw);
     }
@@ -71,15 +75,19 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
   void _pollGw(gateway) {
     final previousOnline = _previousOnline[widget.gatewayId.hashCode] ?? true;
     if (previousOnline && !gateway.online) {
-      ref.read(notificationServiceProvider).showOfflineNotification(
-        'Gateway Offline',
-        '${gateway.name} is no longer connected.',
-      );
+      ref
+          .read(notificationServiceProvider)
+          .showOfflineNotification(
+            'Gateway Offline',
+            '${gateway.name} is no longer connected.',
+          );
     } else if (!previousOnline && gateway.online) {
-      ref.read(notificationServiceProvider).showOnlineNotification(
-        'Gateway Online',
-        '${gateway.name} is back online.',
-      );
+      ref
+          .read(notificationServiceProvider)
+          .showOnlineNotification(
+            'Gateway Online',
+            '${gateway.name} is back online.',
+          );
     }
     _previousOnline[widget.gatewayId.hashCode] = gateway.online;
   }
@@ -87,7 +95,9 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
   Future<void> _fetchDiscovered() async {
     final api = ref.read(apiServiceProvider);
     try {
-      final response = await api.get('/api/gateways/${widget.gatewayId}/discovered');
+      final response = await api.get(
+        '/api/gateways/${widget.gatewayId}/discovered',
+      );
       _discovered = (response.data as List).cast<Map<String, dynamic>>();
       if (mounted) setState(() {});
     } catch (_) {}
@@ -101,37 +111,44 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
       await Future.delayed(const Duration(seconds: 3));
       await _fetchDiscovered();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Scan complete')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Scan complete')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Scan failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Scan failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _scanning = false);
     }
   }
 
-  Future<void> _provision(int deviceId, String name, List<Map<String, dynamic>> caps) async {
+  Future<void> _provision(
+    int deviceId,
+    String name,
+    List<Map<String, dynamic>> caps,
+  ) async {
     final api = ref.read(apiServiceProvider);
     setState(() => _provisioningIds.add(deviceId));
     void say(String m) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
     }
 
     try {
-      final r = await api.post('/api/gateways/${widget.gatewayId}/provision', data: {
-        'deviceId': deviceId,
-        'name': name,
-        'capabilitiesConfig': caps,
-      });
-      final status = (r.data is Map ? (r.data as Map)['status'] : null) as String?;
+      final r = await api.post(
+        '/api/gateways/${widget.gatewayId}/provision',
+        data: {'deviceId': deviceId, 'name': name, 'capabilitiesConfig': caps},
+      );
+      final status =
+          (r.data is Map ? (r.data as Map)['status'] : null) as String?;
       if (status == 'registered_but_offline') {
-        say('The gateway is offline, so the node could not be reached. Bring the gateway online and try again.');
+        say(
+          'The gateway is offline, so the node could not be reached. Bring the gateway online and try again.',
+        );
         return;
       }
       say('Sending settings to node $deviceId…');
@@ -139,13 +156,17 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
       for (var i = 0; i < 22 && mounted; i++) {
         await Future.delayed(const Duration(seconds: 2));
         await ref.read(nodesProvider(widget.gatewayId).notifier).fetchNodes();
-        final linked = ref.read(nodesProvider(widget.gatewayId)).any((n) => n.deviceId == deviceId);
+        final linked = ref
+            .read(nodesProvider(widget.gatewayId))
+            .any((n) => n.deviceId == deviceId);
         if (linked) {
           say('Node $deviceId connected');
           return;
         }
       }
-      say('Node $deviceId did not report in. Check that it is powered and within range of the gateway, then try again.');
+      say(
+        'Node $deviceId did not report in. Check that it is powered and within range of the gateway, then try again.',
+      );
     } catch (e) {
       say('Could not add the node: ${apiError(e, 'request failed')}');
     } finally {
@@ -179,13 +200,19 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
           icon: Icon(Icons.arrow_back, color: context.c.muted),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(gw?.name ?? 'Gateway', style: TextStyle(color: context.c.text)),
+        title: Text(
+          gw?.name ?? 'Gateway',
+          style: TextStyle(color: context.c.text),
+        ),
         actions: [
           IconButton(
             icon: Icon(Icons.settings, color: context.c.muted),
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => GatewaySettingsScreen(gatewayId: widget.gatewayId)),
+                MaterialPageRoute(
+                  builder: (_) =>
+                      GatewaySettingsScreen(gatewayId: widget.gatewayId),
+                ),
               );
             },
           ),
@@ -211,12 +238,23 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
                       children: [
                         _statusDot(gw?.online ?? false),
                         const SizedBox(width: 8),
-                        Text(gw?.online == true ? 'Online' : 'Offline',
-                            style: TextStyle(
-                                color: gw?.online == true ? context.c.ok : context.c.bad,
-                                fontWeight: FontWeight.w600)),
+                        Text(
+                          gw?.online == true ? 'Online' : 'Offline',
+                          style: TextStyle(
+                            color: gw?.online == true
+                                ? context.c.ok
+                                : context.c.bad,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         const Spacer(),
-                        Text('ID: ${gw?.id ?? ''}', style: TextStyle(color: context.c.muted, fontSize: 12)),
+                        Text(
+                          'ID: ${gw?.id ?? ''}',
+                          style: TextStyle(
+                            color: context.c.muted,
+                            fontSize: 12,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -224,7 +262,10 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
                       children: [
                         _statBox('Nodes', '${nodes.length}'),
                         const SizedBox(width: 12),
-                        _statBox('Online', '${nodes.where((n) => n.isOnline).length}'),
+                        _statBox(
+                          'Online',
+                          '${nodes.where((n) => n.isOnline).length}',
+                        ),
                         const SizedBox(width: 12),
                         _statBox('Discovered', '${unlinked.length}'),
                       ],
@@ -238,14 +279,35 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
             // Linked nodes section
             Row(
               children: [
-                Text('Nodes', style: TextStyle(color: context.c.text, fontSize: 16, fontWeight: FontWeight.w600)),
+                Text(
+                  'Nodes',
+                  style: TextStyle(
+                    color: context.c.text,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const Spacer(),
                 TextButton.icon(
                   onPressed: _scanning ? null : _scan,
                   icon: _scanning
-                      ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: context.c.accent))
-                      : Icon(Icons.wifi_find, color: context.c.accent, size: 18),
-                  label: Text(_scanning ? 'Scanning…' : 'Scan', style: TextStyle(color: context.c.accent, fontSize: 13)),
+                      ? SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: context.c.accent,
+                          ),
+                        )
+                      : Icon(
+                          Icons.wifi_find,
+                          color: context.c.accent,
+                          size: 18,
+                        ),
+                  label: Text(
+                    _scanning ? 'Scanning…' : 'Scan',
+                    style: TextStyle(color: context.c.accent, fontSize: 13),
+                  ),
                 ),
               ],
             ),
@@ -255,19 +317,33 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
                 color: context.c.card,
                 child: Padding(
                   padding: EdgeInsets.all(24),
-                  child: Center(child: Text('No nodes. Scan for nearby devices.', style: TextStyle(color: context.c.muted))),
+                  child: Center(
+                    child: Text(
+                      'No nodes. Scan for nearby devices.',
+                      style: TextStyle(color: context.c.muted),
+                    ),
+                  ),
                 ),
               )
             else ...[
               ...nodes.map((n) => _NodeCard(n, widget.gatewayId)),
               if (unlinked.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                Text('Discovered', style: TextStyle(color: context.c.muted, fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  'Discovered',
+                  style: TextStyle(
+                    color: context.c.muted,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                ...unlinked.map((d) => _DiscoveredCard(d, _provisioningIds, () {
-                  final did = d['deviceId'] as int;
-                  _showProvisionDialog(did);
-                })),
+                ...unlinked.map(
+                  (d) => _DiscoveredCard(d, _provisioningIds, () {
+                    final did = d['deviceId'] as int;
+                    _showProvisionDialog(did);
+                  }),
+                ),
               ],
             ],
           ],
@@ -281,12 +357,18 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
     try {
       catalog = await ref.read(capCatalogProvider.future);
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not load the module list. Try again.')));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not load the module list. Try again.'),
+          ),
+        );
       return;
     }
     if (!mounted) return;
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => _ProvisionDialog(
         catalog: catalog,
         deviceId: deviceId,
@@ -299,7 +381,9 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
   }
 
   Widget _statusDot(bool online) {
-    return Container(width: 10, height: 10,
+    return Container(
+      width: 10,
+      height: 10,
       decoration: BoxDecoration(
         color: online ? context.c.ok : context.c.subtle,
         shape: BoxShape.circle,
@@ -318,7 +402,14 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
         ),
         child: Column(
           children: [
-            Text(value, style: TextStyle(color: context.c.text, fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: TextStyle(
+                color: context.c.text,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             Text(label, style: TextStyle(color: context.c.muted, fontSize: 11)),
           ],
         ),
@@ -343,22 +434,32 @@ class _DiscoveredCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: provisioning ? context.c.accent : context.c.border),
+        side: BorderSide(
+          color: provisioning ? context.c.accent : context.c.border,
+        ),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        title: Text('Device $did',
-            style: TextStyle(color: context.c.text, fontSize: 14)),
-        subtitle: const Row(
-          children: [
-            _DiscBadge(),
-          ],
+        title: Text(
+          'Device $did',
+          style: TextStyle(color: context.c.text, fontSize: 14),
         ),
+        subtitle: const Row(children: [_DiscBadge()]),
         trailing: provisioning
-            ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: context.c.accent))
+            ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: context.c.accent,
+                ),
+              )
             : TextButton(
                 onPressed: onConnect,
-                child: Text('Connect', style: TextStyle(color: context.c.accent, fontSize: 13)),
+                child: Text(
+                  'Connect',
+                  style: TextStyle(color: context.c.accent, fontSize: 13),
+                ),
               ),
       ),
     );
@@ -376,8 +477,14 @@ class _DiscBadge extends StatelessWidget {
         color: context.c.primary.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text('Discovered',
-          style: TextStyle(fontSize: 10, color: context.c.accent, fontWeight: FontWeight.w600)),
+      child: Text(
+        'Discovered',
+        style: TextStyle(
+          fontSize: 10,
+          color: context.c.accent,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
@@ -387,7 +494,11 @@ class _ProvisionDialog extends StatefulWidget {
   final int deviceId;
   final void Function(String name, List<Map<String, dynamic>> caps) onProvision;
 
-  const _ProvisionDialog({required this.catalog, required this.deviceId, required this.onProvision});
+  const _ProvisionDialog({
+    required this.catalog,
+    required this.deviceId,
+    required this.onProvision,
+  });
 
   @override
   State<_ProvisionDialog> createState() => _ProvisionDialogState();
@@ -395,7 +506,9 @@ class _ProvisionDialog extends StatefulWidget {
 
 class _ProvisionDialogState extends State<_ProvisionDialog> {
   final _nameCtrl = TextEditingController();
-  late final List<CapEntry> _caps = [CapEntry(widget.catalog.of('digitalOutput') ?? widget.catalog.types.first)];
+  late final List<CapEntry> _caps = [
+    CapEntry(widget.catalog.of('digitalOutput') ?? widget.catalog.types.first),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -406,8 +519,10 @@ class _ProvisionDialogState extends State<_ProvisionDialog> {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: context.c.border),
       ),
-      title: Text('Provision Device ${widget.deviceId}',
-          style: TextStyle(color: context.c.text, fontSize: 16)),
+      title: Text(
+        'Provision Device ${widget.deviceId}',
+        style: TextStyle(color: context.c.text, fontSize: 16),
+      ),
       content: SingleChildScrollView(
         child: SizedBox(
           width: double.maxFinite,
@@ -450,7 +565,14 @@ class _ProvisionDialogState extends State<_ProvisionDialog> {
   }
 
   Widget _fieldLabel(String text) {
-    return Text(text, style: TextStyle(color: context.c.text, fontSize: 12, fontWeight: FontWeight.w600));
+    return Text(
+      text,
+      style: TextStyle(
+        color: context.c.text,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+    );
   }
 
   Widget _darkField({required Widget child}) {
@@ -490,23 +612,38 @@ class _NodeCard extends StatelessWidget {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-        title: Text(node.displayName,
-            style: TextStyle(color: context.c.text, fontSize: 14)),
+        title: Text(
+          node.displayName,
+          style: TextStyle(color: context.c.text, fontSize: 14),
+        ),
         subtitle: Row(
           children: [
-            _badge(context, node.isOnline ? 'Online' : 'Offline', node.isOnline),
+            _badge(
+              context,
+              node.isOnline ? 'Online' : 'Offline',
+              node.isOnline,
+            ),
             const SizedBox(width: 8),
-            Text(node.typeLabel, style: TextStyle(color: context.c.muted, fontSize: 11)),
+            Text(
+              node.typeLabel,
+              style: TextStyle(color: context.c.muted, fontSize: 11),
+            ),
             if (node.value != null) ...[
               const SizedBox(width: 8),
-              Text('Value: ${node.value}', style: TextStyle(color: context.c.accent, fontSize: 11)),
+              Text(
+                'Value: ${node.value}',
+                style: TextStyle(color: context.c.accent, fontSize: 11),
+              ),
             ],
           ],
         ),
         trailing: Icon(Icons.chevron_right, color: context.c.subtle),
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => NodeDetailScreen(node: node, gatewayId: gatewayId)),
+            MaterialPageRoute(
+              builder: (_) =>
+                  NodeDetailScreen(node: node, gatewayId: gatewayId),
+            ),
           );
         },
       ),
@@ -522,10 +659,14 @@ class _NodeCard extends StatelessWidget {
             : context.c.subtle.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(label,
-          style: TextStyle(fontSize: 10,
-              color: online ? context.c.ok : context.c.muted,
-              fontWeight: FontWeight.w600)),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          color: online ? context.c.ok : context.c.muted,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

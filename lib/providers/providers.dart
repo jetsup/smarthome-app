@@ -10,21 +10,36 @@ import '../services/notification_service.dart';
 
 final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
 
-final connectivityServiceProvider = Provider<ConnectivityService>((ref) => ConnectivityService());
+final connectivityServiceProvider = Provider<ConnectivityService>(
+  (ref) => ConnectivityService(),
+);
 
-final authServiceProvider = Provider<AuthService>((ref) => AuthService(ref.watch(apiServiceProvider)));
+final authServiceProvider = Provider<AuthService>(
+  (ref) => AuthService(ref.watch(apiServiceProvider)),
+);
 
-final discoveryServiceProvider = Provider<DiscoveryService>((ref) => DiscoveryService());
+final discoveryServiceProvider = Provider<DiscoveryService>(
+  (ref) => DiscoveryService(),
+);
 
-final notificationServiceProvider = Provider<NotificationService>((ref) => NotificationService());
+final notificationServiceProvider = Provider<NotificationService>(
+  (ref) => NotificationService(),
+);
 
-final mfaServiceProvider = Provider<MfaService>((ref) => MfaService(ref.watch(apiServiceProvider)));
+final mfaServiceProvider = Provider<MfaService>(
+  (ref) => MfaService(ref.watch(apiServiceProvider)),
+);
 
-final gatewaysProvider = StateNotifierProvider<GatewaysNotifier, List<Gateway>>((ref) => GatewaysNotifier(ref));
+final gatewaysProvider = StateNotifierProvider<GatewaysNotifier, List<Gateway>>(
+  (ref) => GatewaysNotifier(ref),
+);
 
 final selectedGatewayProvider = StateProvider<Gateway?>((ref) => null);
 
-final nodesProvider = StateNotifierProvider.family<NodesNotifier, List<SmartNode>, String>((ref, gatewayId) => NodesNotifier(ref, gatewayId));
+final nodesProvider =
+    StateNotifierProvider.family<NodesNotifier, List<SmartNode>, String>(
+      (ref, gatewayId) => NodesNotifier(ref, gatewayId),
+    );
 
 final isLocalNetworkProvider = StateProvider<bool>((ref) => false);
 
@@ -32,9 +47,18 @@ final isAuthenticatedProvider = StateProvider<bool>((ref) => false);
 
 final discoveryResultsProvider = StateProvider<List<Gateway>>((ref) => []);
 
-final splashStateProvider = StateProvider<SplashState>((ref) => SplashState.discovering);
+final splashStateProvider = StateProvider<SplashState>(
+  (ref) => SplashState.discovering,
+);
 
-enum SplashState { permission, discovering, found, notFound, authenticated, error }
+enum SplashState {
+  permission,
+  discovering,
+  found,
+  notFound,
+  authenticated,
+  error,
+}
 
 class GatewaysNotifier extends StateNotifier<List<Gateway>> {
   final Ref _ref;

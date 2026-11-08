@@ -37,8 +37,10 @@ class HmiWifiStatus {
   const HmiWifiStatus(this.state, [this.detail = '']);
 
   static HmiWifiStatus parse(String s) {
-    if (s.startsWith('ok:')) return HmiWifiStatus(HmiWifiState.connected, s.substring(3));
-    if (s.startsWith('fail:')) return HmiWifiStatus(HmiWifiState.failed, s.substring(5));
+    if (s.startsWith('ok:'))
+      return HmiWifiStatus(HmiWifiState.connected, s.substring(3));
+    if (s.startsWith('fail:'))
+      return HmiWifiStatus(HmiWifiState.failed, s.substring(5));
     if (s == 'connecting') return const HmiWifiStatus(HmiWifiState.connecting);
     return const HmiWifiStatus(HmiWifiState.idle);
   }
@@ -75,8 +77,8 @@ class HmiProvisioningService {
     final scan = _ble
         .scanForDevices(withServices: [_svc], scanMode: ScanMode.lowLatency)
         .listen((d) {
-      if (d.name == bleName && !found.isCompleted) found.complete(d);
-    });
+          if (d.name == bleName && !found.isCompleted) found.complete(d);
+        });
     final DiscoveredDevice dev;
     try {
       dev = await found.future.timeout(const Duration(seconds: 15));
@@ -92,28 +94,45 @@ class HmiProvisioningService {
           id: dev.id,
           connectionTimeout: const Duration(seconds: 12),
         )
-        .listen((u) {
-      if (u.connectionState == DeviceConnectionState.connected && !connected.isCompleted) {
-        connected.complete();
-      } else if (u.connectionState == DeviceConnectionState.disconnected &&
-          !connected.isCompleted) {
-        connected.completeError('Bluetooth connection to the HMI failed.');
-      }
-    }, onError: (Object e) {
-      if (!connected.isCompleted) connected.completeError('Bluetooth error: $e');
-    });
+        .listen(
+          (u) {
+            if (u.connectionState == DeviceConnectionState.connected &&
+                !connected.isCompleted) {
+              connected.complete();
+            } else if (u.connectionState ==
+                    DeviceConnectionState.disconnected &&
+                !connected.isCompleted) {
+              connected.completeError(
+                'Bluetooth connection to the HMI failed.',
+              );
+            }
+          },
+          onError: (Object e) {
+            if (!connected.isCompleted)
+              connected.completeError('Bluetooth error: $e');
+          },
+        );
     await connected.future;
     _deviceId = dev.id;
     try {
       await _ble.requestMtu(deviceId: dev.id, mtu: 185);
-    } catch (_) {/* default MTU still works for short credentials */}
+    } catch (_) {
+      /* default MTU still works for short credentials */
+    }
 
     final q = QualifiedCharacteristic(
-        serviceId: _svc, characteristicId: _stat, deviceId: dev.id);
-    _statSub = _ble.subscribeToCharacteristic(q).listen(
-      (data) => _status.add(HmiWifiStatus.parse(utf8.decode(data, allowMalformed: true))),
-      onError: (_) {},
+      serviceId: _svc,
+      characteristicId: _stat,
+      deviceId: dev.id,
     );
+    _statSub = _ble
+        .subscribeToCharacteristic(q)
+        .listen(
+          (data) => _status.add(
+            HmiWifiStatus.parse(utf8.decode(data, allowMalformed: true)),
+          ),
+          onError: (_) {},
+        );
   }
 
   /// Send the chosen network. The result arrives on [status].
@@ -125,8 +144,13 @@ class HmiProvisioningService {
     final id = _deviceId;
     if (id == null) throw 'Not connected to the HMI.';
     final q = QualifiedCharacteristic(
-        serviceId: _svc, characteristicId: _cred, deviceId: id);
-    final payload = utf8.encode(jsonEncode({'s': ssid, 'p': password, 'k': code}));
+      serviceId: _svc,
+      characteristicId: _cred,
+      deviceId: id,
+    );
+    final payload = utf8.encode(
+      jsonEncode({'s': ssid, 'p': password, 'k': code}),
+    );
     await _ble.writeCharacteristicWithResponse(q, value: payload);
   }
 

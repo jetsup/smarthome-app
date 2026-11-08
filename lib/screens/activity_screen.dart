@@ -39,7 +39,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   final _items = <_Entry>[];
   String _cat = '';
   bool _failedOnly = false;
-  bool _loading = true, _more = false, _hasMore = false;
+  bool _loading = true;
+  int _page = 1, _pages = 1, _total = 0;
+  static const _pageSize = 25;
   String? _error;
 
   @override
@@ -49,26 +51,34 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   }
 
   Future<void> _load({bool reset = false}) async {
-    if (reset) {
-      setState(() { _loading = true; _error = null; });
-    } else {
-      setState(() => _more = true);
-    }
+    if (reset) _page = 1;
+    setState(() { _loading = true; _error = null; });
     try {
       final r = await ref.read(apiServiceProvider).get('/api/audit', params: {
-        'limit': 40,
+        'limit': _pageSize,
+        'page': _page,
         if (_cat.isNotEmpty) 'category': _cat,
         if (_failedOnly) 'outcome': 'failed',
-        if (!reset && _items.isNotEmpty) 'before': _items.last.id,
       });
-      final list = ((r.data as Map)['items'] as List).map((j) => _Entry(j as Map<String, dynamic>)).toList();
-      if (reset) _items.clear();
-      _items.addAll(list);
-      _hasMore = list.length == 40;
+      final m = r.data as Map;
+      _items
+        ..clear()
+        ..addAll((m['items'] as List).map((j) => _Entry(j as Map<String, dynamic>)));
+      _total = (m['total'] as num?)?.toInt() ?? _items.length;
+      _pages = (m['pages'] as num?)?.toInt() ?? 1;
+      if (_page > _pages) {
+        _page = _pages;
+        return _load();
+      }
     } catch (_) {
       _error = 'Could not load the activity log';
     }
-    if (mounted) setState(() { _loading = false; _more = false; });
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _go(int p) {
+    _page = p.clamp(1, _pages);
+    _load();
   }
 
   String _ago(DateTime d) {
@@ -116,12 +126,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                           onRefresh: () => _load(reset: true),
                           child: ListView.separated(
                             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                            itemCount: _items.length + (_hasMore ? 1 : 0),
+                            itemCount: _items.length,
                             separatorBuilder: (_, __) => Divider(color: c.divider, height: 1),
                             itemBuilder: (_, i) {
-                              if (i == _items.length) {
-                                return TextButton(onPressed: _more ? null : () => _load(), child: Text(_more ? 'Loading…' : 'Load older'));
-                              }
                               final e = _items[i];
                               return Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 12),
@@ -152,6 +159,24 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                           ),
                         ),
         ),
+        if (!_loading && _total > 0)
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                IconButton(
+                    tooltip: 'Previous page',
+                    onPressed: _page > 1 ? () => _go(_page - 1) : null,
+                    icon: const Icon(Icons.chevron_left)),
+                Text('Page $_page of $_pages · $_total events', style: TextStyle(color: c.muted, fontSize: 12)),
+                IconButton(
+                    tooltip: 'Next page',
+                    onPressed: _page < _pages ? () => _go(_page + 1) : null,
+                    icon: const Icon(Icons.chevron_right)),
+              ]),
+            ),
+          ),
       ]),
     );
   }

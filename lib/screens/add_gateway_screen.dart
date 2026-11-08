@@ -25,7 +25,6 @@ class AddGatewayScreen extends ConsumerStatefulWidget {
 enum _Step { find, connecting, wifi, name, linking, done }
 
 class _AddGatewayScreenState extends ConsumerState<AddGatewayScreen> {
-
   final _svc = GatewayProvisioningService();
   final _ssidCtl = TextEditingController();
   final _passCtl = TextEditingController();
@@ -66,7 +65,10 @@ class _AddGatewayScreenState extends ConsumerState<AddGatewayScreen> {
         _btOff = off;
         if (off || st == BleStatus.ready) _error = null;
       });
-      if (st == BleStatus.ready && wasOff && _step == _Step.find && !_scanningBle) {
+      if (st == BleStatus.ready &&
+          wasOff &&
+          _step == _Step.find &&
+          !_scanningBle) {
         _startFind();
       }
     }
@@ -99,7 +101,8 @@ class _AddGatewayScreenState extends ConsumerState<AddGatewayScreen> {
     if (!await _svc.ensurePermissions()) {
       setState(() {
         _scanningBle = false;
-        _error = 'Bluetooth and location permissions are needed to find gateways.';
+        _error =
+            'Bluetooth and location permissions are needed to find gateways.';
       });
       return;
     }
@@ -251,7 +254,9 @@ class _AddGatewayScreenState extends ConsumerState<AddGatewayScreen> {
       setState(() => _busyMsg = 'Giving the gateway its key…');
       await _svc.sendKey(key, hubHost, gwName);
 
-      setState(() => _busyMsg = 'The gateway is restarting and joining the hub…');
+      setState(
+        () => _busyMsg = 'The gateway is restarting and joining the hub…',
+      );
       final deadline = DateTime.now().add(const Duration(seconds: 60));
       while (DateTime.now().isBefore(deadline)) {
         await Future<void>.delayed(const Duration(seconds: 3));
@@ -266,7 +271,8 @@ class _AddGatewayScreenState extends ConsumerState<AddGatewayScreen> {
       if (mounted) {
         setState(() {
           _step = _Step.done;
-          _error = 'The gateway has its key but has not reported in yet. It should appear online shortly.';
+          _error =
+              'The gateway has its key but has not reported in yet. It should appear online shortly.';
         });
       }
     } catch (e) {
@@ -287,8 +293,10 @@ class _AddGatewayScreenState extends ConsumerState<AddGatewayScreen> {
       appBar: AppBar(
         backgroundColor: context.c.card,
         iconTheme: IconThemeData(color: context.c.text),
-        title: Text('Add gateway',
-            style: TextStyle(color: context.c.text, fontWeight: FontWeight.bold)),
+        title: Text(
+          'Add gateway',
+          style: TextStyle(color: context.c.text, fontWeight: FontWeight.bold),
+        ),
       ),
       body: SafeArea(child: _body()),
     );
@@ -312,15 +320,22 @@ class _AddGatewayScreenState extends ConsumerState<AddGatewayScreen> {
   }
 
   Widget _busy(String msg) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          CircularProgressIndicator(color: context.c.accent2),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(msg, textAlign: TextAlign.center, style: TextStyle(color: context.c.text)),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircularProgressIndicator(color: context.c.accent2),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            msg,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: context.c.text),
           ),
-        ]),
-      );
+        ),
+      ],
+    ),
+  );
 
   Widget _errorBox() => _error == null
       ? const SizedBox.shrink()
@@ -335,157 +350,225 @@ class _AddGatewayScreenState extends ConsumerState<AddGatewayScreen> {
         );
 
   InputDecoration _dec(String hint, {Widget? suffix}) => InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: context.c.muted),
-        filled: true,
-        fillColor: context.c.card,
-        suffixIcon: suffix,
-        enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: context.c.border)),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: context.c.accent2)),
-      );
+    hintText: hint,
+    hintStyle: TextStyle(color: context.c.muted),
+    filled: true,
+    fillColor: context.c.card,
+    suffixIcon: suffix,
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: context.c.border),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: context.c.accent2),
+    ),
+  );
 
   Widget _findBody() {
-    final list = _found.values.toList()..sort((a, b) => b.rssi.compareTo(a.rssi));
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      if (_btOff) const BluetoothOffCard(what: 'gateways'),
-      _errorBox(),
-      Row(children: [
-        Expanded(
-          child: Text(
-            'Power on the gateway. A new or reset gateway shows up here automatically — no hotspot needed.',
-            style: TextStyle(color: context.c.muted),
-          ),
+    final list = _found.values.toList()
+      ..sort((a, b) => b.rssi.compareTo(a.rssi));
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (_btOff) const BluetoothOffCard(what: 'gateways'),
+        _errorBox(),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Power on the gateway. A new or reset gateway shows up here automatically — no hotspot needed.',
+                style: TextStyle(color: context.c.muted),
+              ),
+            ),
+            IconButton(
+              onPressed: _scanningBle ? null : _startFind,
+              icon: _scanningBle
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: context.c.accent2,
+                      ),
+                    )
+                  : Icon(Icons.refresh, color: context.c.muted),
+            ),
+          ],
         ),
-        IconButton(
-          onPressed: _scanningBle ? null : _startFind,
-          icon: _scanningBle
-              ? SizedBox(width: 18, height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: context.c.accent2))
-              : Icon(Icons.refresh, color: context.c.muted),
-        ),
-      ]),
-      const SizedBox(height: 8),
-      if (list.isEmpty)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24),
-          child: Center(
-            child: Text(_btOff ? '' : _scanningBle ? 'Looking for gateways…' : 'No gateways found nearby.',
-                style: TextStyle(color: context.c.muted)),
+        const SizedBox(height: 8),
+        if (list.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: Text(
+                _btOff
+                    ? ''
+                    : _scanningBle
+                    ? 'Looking for gateways…'
+                    : 'No gateways found nearby.',
+                style: TextStyle(color: context.c.muted),
+              ),
+            ),
           ),
-        ),
-      for (final g in list)
-        Card(
-          color: context.c.card,
-          margin: const EdgeInsets.only(bottom: 8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(color: context.c.border),
+        for (final g in list)
+          Card(
+            color: context.c.card,
+            margin: const EdgeInsets.only(bottom: 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: context.c.border),
+            ),
+            child: ListTile(
+              leading: Icon(Icons.router, color: context.c.accent2),
+              title: Text(
+                g.name,
+                style: TextStyle(
+                  color: context.c.text,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: Text(
+                'Signal ${g.rssi} dBm',
+                style: TextStyle(color: context.c.muted, fontSize: 12),
+              ),
+              trailing: Icon(Icons.chevron_right, color: context.c.muted),
+              onTap: () => _select(g),
+            ),
           ),
-          child: ListTile(
-            leading: Icon(Icons.router, color: context.c.accent2),
-            title: Text(g.name, style: TextStyle(color: context.c.text, fontWeight: FontWeight.w600)),
-            subtitle: Text('Signal ${g.rssi} dBm', style: TextStyle(color: context.c.muted, fontSize: 12)),
-            trailing: Icon(Icons.chevron_right, color: context.c.muted),
-            onTap: () => _select(g),
-          ),
-        ),
-    ]);
+      ],
+    );
   }
 
   Widget _wifiBody() {
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      _errorBox(),
-      Row(children: [
-        Expanded(
-          child: Text('Connected to ${_selected?.name}. Choose the Wi-Fi it should join.',
-              style: TextStyle(color: context.c.muted)),
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _errorBox(),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Connected to ${_selected?.name}. Choose the Wi-Fi it should join.',
+                style: TextStyle(color: context.c.muted),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Blink the gateway LED',
+              onPressed: () => _svc.identify(),
+              icon: Icon(Icons.lightbulb_outline, color: context.c.muted),
+            ),
+          ],
         ),
-        IconButton(
-          tooltip: 'Blink the gateway LED',
-          onPressed: () => _svc.identify(),
-          icon: Icon(Icons.lightbulb_outline, color: context.c.muted),
+        const SizedBox(height: 8),
+        WifiPicker(
+          networks: _networks,
+          scanning: _scanningWifi,
+          onRefresh: _refreshWifi,
+          ssidCtl: _ssidCtl,
+          passCtl: _passCtl,
+          showPass: _showPass,
+          onTogglePass: () => setState(() => _showPass = !_showPass),
+          onSelectionChanged: () => setState(() {}),
+          onSubmit: _wifiBusy ? null : _sendWifi,
+          submitLabel: _wifiBusy ? _busyMsg : 'Send to gateway',
+          helper:
+              'The gateway tests the network and only saves it if it connects.',
         ),
-      ]),
-      const SizedBox(height: 8),
-      WifiPicker(
-        networks: _networks,
-        scanning: _scanningWifi,
-        onRefresh: _refreshWifi,
-        ssidCtl: _ssidCtl,
-        passCtl: _passCtl,
-        showPass: _showPass,
-        onTogglePass: () => setState(() => _showPass = !_showPass),
-        onSelectionChanged: () => setState(() {}),
-        onSubmit: _wifiBusy ? null : _sendWifi,
-        submitLabel: _wifiBusy ? _busyMsg : 'Send to gateway',
-        helper: 'The gateway tests the network and only saves it if it connects.',
-      ),
-    ]);
+      ],
+    );
   }
 
   Widget _nameBody() {
     final gateways = ref.watch(gatewaysProvider);
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      _errorBox(),
-      Text('Wi-Fi is set. Now link this gateway to your account:',
-          style: TextStyle(color: context.c.muted)),
-      const SizedBox(height: 12),
-      RadioGroup<String>(
-        groupValue: _target,
-        onChanged: (v) => setState(() => _target = v ?? 'new'),
-        child: Column(children: [
-          RadioListTile<String>(
-            value: 'new',
-            activeColor: context.c.accent2,
-            title: Text('New gateway', style: TextStyle(color: context.c.text)),
-          ),
-          if (_target == 'new')
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: TextField(
-                controller: _nameCtl,
-                style: TextStyle(color: context.c.text),
-                decoration: _dec('Gateway name'),
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _errorBox(),
+        Text(
+          'Wi-Fi is set. Now link this gateway to your account:',
+          style: TextStyle(color: context.c.muted),
+        ),
+        const SizedBox(height: 12),
+        RadioGroup<String>(
+          groupValue: _target,
+          onChanged: (v) => setState(() => _target = v ?? 'new'),
+          child: Column(
+            children: [
+              RadioListTile<String>(
+                value: 'new',
+                activeColor: context.c.accent2,
+                title: Text(
+                  'New gateway',
+                  style: TextStyle(color: context.c.text),
+                ),
               ),
-            ),
-          for (final g in gateways)
-            RadioListTile<String>(
-              value: g.id,
-              activeColor: context.c.accent2,
-              title: Text('Re-link “${g.name}”', style: TextStyle(color: context.c.text)),
-              subtitle: Text(g.online ? 'Currently online' : 'Offline',
-                  style: TextStyle(color: context.c.muted, fontSize: 12)),
-            ),
-        ]),
-      ),
-      const SizedBox(height: 12),
-      FilledButton(onPressed: _link, child: const Text('Link gateway')),
-    ]);
+              if (_target == 'new')
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: TextField(
+                    controller: _nameCtl,
+                    style: TextStyle(color: context.c.text),
+                    decoration: _dec('Gateway name'),
+                  ),
+                ),
+              for (final g in gateways)
+                RadioListTile<String>(
+                  value: g.id,
+                  activeColor: context.c.accent2,
+                  title: Text(
+                    'Re-link “${g.name}”',
+                    style: TextStyle(color: context.c.text),
+                  ),
+                  subtitle: Text(
+                    g.online ? 'Currently online' : 'Offline',
+                    style: TextStyle(color: context.c.muted, fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        FilledButton(onPressed: _link, child: const Text('Link gateway')),
+      ],
+    );
   }
 
   Widget _doneBody() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(_error == null ? Icons.check_circle : Icons.hourglass_top,
-                color: _error == null ? context.c.ok : context.c.accent2, size: 72),
-            const SizedBox(height: 16),
-            Text(_error == null ? 'Gateway added and online' : 'Gateway linked',
-                style: TextStyle(color: context.c.text, fontSize: 20, fontWeight: FontWeight.bold)),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: context.c.muted)),
-            ],
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Done'),
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _error == null ? Icons.check_circle : Icons.hourglass_top,
+            color: _error == null ? context.c.ok : context.c.accent2,
+            size: 72,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _error == null ? 'Gateway added and online' : 'Gateway linked',
+            style: TextStyle(
+              color: context.c.text,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
-          ]),
-        ),
-      );
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.c.muted),
+            ),
+          ],
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    ),
+  );
 }

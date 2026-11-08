@@ -57,6 +57,9 @@ class _DisplayAppearanceScreenState extends ConsumerState<DisplayAppearanceScree
   String _accent = '00A8E8';
   double _brightness = 100;
   bool _led = true;
+  int _sleepAfter = 0;
+  bool _ledSleepOff = true;
+  static const _sleepOptions = {0: 'Never', 15: '15 seconds', 30: '30 seconds', 60: '1 minute', 120: '2 minutes', 300: '5 minutes', 600: '10 minutes', 1800: '30 minutes'};
   String? _error;
   Timer? _debounce;
 
@@ -81,6 +84,9 @@ class _DisplayAppearanceScreenState extends ConsumerState<DisplayAppearanceScree
         _accent = (m['accent'] as String? ?? '00A8E8').toUpperCase();
         _brightness = ((m['brightness'] as num?) ?? 100).toDouble().clamp(10, 100);
         _led = m['statusLed'] != false;
+        final sa = ((m['sleepAfter'] as num?) ?? 0).toInt();
+        _sleepAfter = _sleepOptions.containsKey(sa) ? sa : 0;
+        _ledSleepOff = m['ledSleepOff'] != false;
         _background = (m['background'] as String? ?? '').toUpperCase();
         _ledMode = _patterns.containsKey(m['ledMode']) ? m['ledMode'] as String : 'solid';
         _ledColor = (m['ledColor'] as String? ?? '').toUpperCase();
@@ -254,6 +260,34 @@ class _DisplayAppearanceScreenState extends ConsumerState<DisplayAppearanceScree
                       setState(() => _brightness = v);
                       _debounce?.cancel();
                       _debounce = Timer(const Duration(milliseconds: 400), () => _save({'brightness': v.round()}));
+                    },
+                  ),
+                  Row(children: [
+                    Expanded(
+                      child: Text('Turn the screen off after', style: TextStyle(color: c.text, fontWeight: FontWeight.w700)),
+                    ),
+                    DropdownButton<int>(
+                      value: _sleepAfter,
+                      dropdownColor: c.card,
+                      underline: const SizedBox.shrink(),
+                      style: TextStyle(color: c.text),
+                      items: [for (final e in _sleepOptions.entries) DropdownMenuItem(value: e.key, child: Text(e.value))],
+                      onChanged: (v) {
+                        if (v == null) return;
+                        setState(() => _sleepAfter = v);
+                        _save({'sleepAfter': v});
+                      },
+                    ),
+                  ]),
+                  Text('Saves power: the display goes dark after this long without a touch. Touch it to wake.',
+                      style: TextStyle(color: c.muted, fontSize: 12)),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('Turn the RGB light off with the screen', style: TextStyle(color: c.text, fontWeight: FontWeight.w600)),
+                    value: _ledSleepOff,
+                    onChanged: (v) {
+                      setState(() => _ledSleepOff = v);
+                      _save({'ledSleepOff': v});
                     },
                   ),
                   const SizedBox(height: 10),

@@ -11,13 +11,15 @@ class ConnectivityService {
   bool get isOnLocalNetwork => _isOnLocalNetwork;
 
   Stream<bool> get onLocalNetworkChanged => _onLocalController.stream;
-  final StreamController<bool> _onLocalController = StreamController<bool>.broadcast();
+  final StreamController<bool> _onLocalController =
+      StreamController<bool>.broadcast();
 
   Future<bool> checkLocalConnectivity(String gatewayIp) async {
     _lastLocalGatewayIp = gatewayIp;
     try {
-      final result = await InternetAddress.lookup(gatewayIp)
-          .timeout(const Duration(seconds: 3));
+      final result = await InternetAddress.lookup(
+        gatewayIp,
+      ).timeout(const Duration(seconds: 3));
       if (result.isNotEmpty) {
         _isOnLocalNetwork = true;
         if (!_onLocalController.isClosed) _onLocalController.add(true);
@@ -30,19 +32,16 @@ class ConnectivityService {
   }
 
   void startMonitoring(void Function(bool isLocal) onChanged) {
-    _subscription = _connectivity.onConnectivityChanged.listen(
-      (result) {
-        if (result.contains(ConnectivityResult.wifi)) {
-          if (_lastLocalGatewayIp != null) {
-            checkLocalConnectivity(_lastLocalGatewayIp!);
-          }
-        } else {
-          _isOnLocalNetwork = false;
-          onChanged(false);
+    _subscription = _connectivity.onConnectivityChanged.listen((result) {
+      if (result.contains(ConnectivityResult.wifi)) {
+        if (_lastLocalGatewayIp != null) {
+          checkLocalConnectivity(_lastLocalGatewayIp!);
         }
-      },
-      onError: (_) {},
-    );
+      } else {
+        _isOnLocalNetwork = false;
+        onChanged(false);
+      }
+    }, onError: (_) {});
   }
 
   void stopMonitoring() {

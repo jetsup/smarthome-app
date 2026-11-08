@@ -6,7 +6,9 @@ class DiscoveryService {
   MDnsClient? _client;
   bool _discovering = false;
 
-  Stream<Gateway> discoverGateways({Duration timeout = const Duration(seconds: 8)}) async* {
+  Stream<Gateway> discoverGateways({
+    Duration timeout = const Duration(seconds: 8),
+  }) async* {
     _discovering = true;
     _client = MDnsClient();
     await _client!.start();
@@ -35,9 +37,7 @@ class DiscoveryService {
               )
               .first;
           final txtRecord = await _client!
-              .lookup<TxtResourceRecord>(
-                ResourceRecordQuery.text(domain),
-              )
+              .lookup<TxtResourceRecord>(ResourceRecordQuery.text(domain))
               .first;
 
           final ip = ipRecord.address;
