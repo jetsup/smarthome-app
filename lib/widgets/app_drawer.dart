@@ -5,23 +5,24 @@ import '../providers/providers.dart';
 import '../screens/activity_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/displays_screen.dart';
+import '../screens/gateways_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
 import '../theme/app_colors.dart';
 
-enum DrawerPage { gateways, displays, profile, activity, settings }
+enum DrawerPage { dashboard, gateways, displays, profile, activity, settings }
 
 /// App-wide navigation. Every screen it leads to carries the same drawer, so it
 /// can be opened from there too. The gateways screen is the root: the other
 /// screens are opened on top of it (and swap with each other), so Back always
-/// returns to the gateways first.
+/// returns to the dashboard first.
 class AppDrawer extends ConsumerWidget {
   final DrawerPage current;
   final VoidCallback? onLogout;
   final Future<void> Function()? onRefresh;
   const AppDrawer({
     super.key,
-    this.current = DrawerPage.gateways,
+    this.current = DrawerPage.dashboard,
     this.onLogout,
     this.onRefresh,
   });
@@ -30,12 +31,12 @@ class AppDrawer extends ConsumerWidget {
     final nav = Navigator.of(context);
     nav.pop(); // close the drawer
     if (target == current) return;
-    if (target == DrawerPage.gateways) {
+    if (target == DrawerPage.dashboard) {
       nav.popUntil((r) => r.isFirst);
       return;
     }
     final route = MaterialPageRoute(builder: (_) => page!);
-    if (current == DrawerPage.gateways) {
+    if (current == DrawerPage.dashboard) {
       nav.push(route).then((_) => onRefresh?.call());
     } else {
       nav.pushReplacement(route);
@@ -152,10 +153,18 @@ class AppDrawer extends ConsumerWidget {
                   _section(context, 'Devices'),
                   _item(
                     context,
+                    Icons.dashboard_outlined,
+                    'Dashboard',
+                    subtitle: 'Live tiles from your nodes',
+                    selected: current == DrawerPage.dashboard,
+                    onTap: () => _go(context, DrawerPage.dashboard, null),
+                  ),
+                  _item(
+                    context,
                     Icons.router_outlined,
                     'Gateways',
                     selected: current == DrawerPage.gateways,
-                    onTap: () => _go(context, DrawerPage.gateways, null),
+                    onTap: () => _go(context, DrawerPage.gateways, const GatewaysScreen()),
                   ),
                   _item(
                     context,

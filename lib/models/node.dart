@@ -10,6 +10,7 @@ class CapabilityConfig {
   final bool ring; // NeoPixel ring layout
   final int pin2; // second pin (I2C SCL / UART TX)
   final String display; // short live state text from the hub
+  final String symbol; // icon picked on the website's dashboard (kept when the app saves)
 
   CapabilityConfig({
     required this.type,
@@ -21,6 +22,7 @@ class CapabilityConfig {
     this.ring = false,
     this.pin2 = 0,
     this.display = '',
+    this.symbol = '',
   });
 
   factory CapabilityConfig.fromJson(Map<String, dynamic> json) {
@@ -34,6 +36,7 @@ class CapabilityConfig {
       ring: json['ring'] as bool? ?? false,
       pin2: json['pin2'] as int? ?? 0,
       display: json['display'] as String? ?? '',
+      symbol: json['symbol'] as String? ?? '',
     );
   }
 
@@ -45,6 +48,7 @@ class CapabilityConfig {
     'count': count,
     'ring': ring,
     'pin2': pin2,
+    if (symbol.isNotEmpty) 'symbol': symbol,
   };
 }
 

@@ -143,6 +143,10 @@ class ApiService {
   Future<Response> get(String path, {Map<String, dynamic>? params, Map<String, String>? headers}) =>
       _dio.get(path, queryParameters: params, options: _opts(headers));
 
+  /// GET a binary response (a picture).
+  Future<Response<List<int>>> getBytes(String path) =>
+      _dio.get<List<int>>(path, options: Options(responseType: ResponseType.bytes));
+
   Future<Response> post(String path, {dynamic data, Map<String, String>? headers}) =>
       _dio.post(path, data: data, options: _opts(headers));
 

@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/gateway.dart';
 import '../providers/providers.dart';
 import 'login_screen.dart';
-import 'gateways_screen.dart';
+import 'dashboard_screen.dart';
 import '../theme/app_colors.dart';
 
 enum _S { pending, active, done, skipped, failed }
@@ -284,7 +284,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     await _holdMin();
     if (!mounted) return;
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const GatewaysScreen()),
+      MaterialPageRoute(builder: (_) => const DashboardScreen()),
     );
   }
 

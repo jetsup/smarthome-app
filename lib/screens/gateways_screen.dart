@@ -1,16 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../providers/settings_provider.dart';
-import 'login_screen.dart';
 import 'gateway_detail_screen.dart';
 import '../widgets/app_drawer.dart';
-import '../widgets/mfa_approval_host.dart';
 import 'add_gateway_screen.dart';
 import 'unassigned_nodes_screen.dart';
-import 'walkthrough_screen.dart';
 import '../theme/app_colors.dart';
 
 class GatewaysScreen extends ConsumerStatefulWidget {
@@ -24,28 +20,14 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
   Timer? _pollTimer;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   int _unassigned = 0;
-  DateTime? _lastBack;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _load();
-      _maybeShowWalkthrough();
     });
     _startPolling();
-  }
-
-  // First launch after sign-in: show the tour once.
-  Future<void> _maybeShowWalkthrough() async {
-    if (await walkthroughSeen() || !mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => const WalkthroughScreen(),
-      ),
-    );
-    await markWalkthroughSeen();
   }
 
   Future<void> _addGateway() async {
@@ -78,7 +60,6 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
   Future<void> _load() async {
     _loadUnassigned();
     ref.read(gatewaysProvider.notifier).fetchAll();
-    _checkConnectivity();
   }
 
   Future<void> _poll() async {
@@ -100,69 +81,10 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
     }
   }
 
-  // The gateways screen is the root: Back closes the drawer, then asks twice
-  // before leaving the app.
-  void _onBack() {
-    final scaffold = _scaffoldKey.currentState;
-    if (scaffold != null && scaffold.isDrawerOpen) {
-      scaffold.closeDrawer();
-      return;
-    }
-    final now = DateTime.now();
-    if (_lastBack != null && now.difference(_lastBack!) < const Duration(seconds: 2)) {
-      SystemNavigator.pop();
-      return;
-    }
-    _lastBack = now;
-    final m = ScaffoldMessenger.of(context);
-    m.hideCurrentSnackBar();
-    m.showSnackBar(
-      const SnackBar(
-        content: Text('Press back again to exit the app'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _checkConnectivity() {
-    final api = ref.read(apiServiceProvider);
-    final baseUrl = api.baseUrl;
-    if (baseUrl != null) {
-      final host = Uri.parse(baseUrl).host;
-      ref.read(connectivityServiceProvider).checkLocalConnectivity(host);
-    }
-
-    final scaffold = ScaffoldMessenger.of(context);
-    ref.read(connectivityServiceProvider).startMonitoring((isLocal) {
-      ref.read(isLocalNetworkProvider.notifier).state = isLocal;
-      if (!isLocal) {
-        scaffold.showSnackBar(
-          const SnackBar(
-            content: Text('Left local network, using remote connection'),
-          ),
-        );
-      }
-    });
-  }
-
   @override
   void dispose() {
     _pollTimer?.cancel();
-    try {
-      ref.read(connectivityServiceProvider).stopMonitoring();
-    } catch (_) {}
     super.dispose();
-  }
-
-  Future<void> _logout() async {
-    _pollTimer?.cancel();
-    await ref.read(authServiceProvider).logout();
-    ref.read(apiServiceProvider).clearToken();
-    if (mounted) {
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
-    }
   }
 
   @override
@@ -174,20 +96,10 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
       (_, __) => _startPolling(),
     );
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _onBack();
-      },
-      child: MfaApprovalHost(
-      child: Scaffold(
+    return Scaffold(
         key: _scaffoldKey,
         backgroundColor: context.c.bg,
-        drawer: AppDrawer(
-          current: DrawerPage.gateways,
-          onLogout: _logout,
-          onRefresh: _load,
-        ),
+        drawer: const AppDrawer(current: DrawerPage.gateways),
         appBar: AppBar(
           backgroundColor: context.c.card,
           iconTheme: IconThemeData(color: context.c.text),
@@ -284,8 +196,6 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
             ),
           ],
         ),
-      ),
-      ),
     );
   }
 }

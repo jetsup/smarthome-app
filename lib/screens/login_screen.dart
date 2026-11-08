@@ -7,7 +7,7 @@ import '../config.dart';
 import '../providers/providers.dart';
 import '../services/auth_service.dart';
 import '../theme/app_colors.dart';
-import 'gateways_screen.dart';
+import 'dashboard_screen.dart';
 
 enum _Step { credentials, mfa }
 
@@ -53,7 +53,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await api.saveHubUrl(api.baseUrl ?? kDefaultHubUrl);
     ref.read(isAuthenticatedProvider.notifier).state = true;
     if (mounted) {
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const GatewaysScreen()));
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const DashboardScreen()));
     }
   }
 

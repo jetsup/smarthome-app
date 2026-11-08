@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../services/api_errors.dart';
 import '../theme/app_colors.dart';
+import '../widgets/lock_background_card.dart';
 
 /// Theme, background, accent colour, brightness and RGB light of one touch display.
 /// The display picks the change up within a few seconds.
@@ -380,7 +381,13 @@ class _DisplayAppearanceScreenState extends ConsumerState<DisplayAppearanceScree
                       ),
                     ],
                   ],
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 18),
+                  Text('Lock-screen picture', style: TextStyle(color: c.text, fontSize: 16, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  Text('Shown behind the clock when the display locks.', style: TextStyle(color: c.muted, fontSize: 12)),
+                  const SizedBox(height: 10),
+                  LockBackgroundCard(displaySlug: widget.displaySlug),
+                  const SizedBox(height: 14),
                   Text('The display applies changes within a few seconds.', style: TextStyle(color: c.muted, fontSize: 12)),
                 ]),
     );

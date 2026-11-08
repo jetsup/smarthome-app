@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/node.dart';
 import '../services/catalog.dart';
+import '../services/symbols.dart';
 import '../theme/app_colors.dart';
 
 /// One editable module (pin, NeoPixel count, ring…).
@@ -10,10 +11,12 @@ class CapEntry {
   String type;
   final Map<String, TextEditingController> nums = {};
   bool ring = false;
+  String symbol; // chosen on the website; carried through so saving here doesn't lose it
   final TextEditingController label;
 
   CapEntry(CapType t, {CapabilityConfig? from})
       : type = t.key,
+        symbol = from != null && from.type == t.key ? from.symbol : '',
         label = TextEditingController(text: from?.label ?? '') {
     for (final f in t.fields) {
       if (f.key == 'ring') {
@@ -40,6 +43,7 @@ class CapEntry {
     return {
       'type': type,
       'label': label.text.trim(),
+      if (symbol.isNotEmpty) 'symbol': symbol,
       if (nums.containsKey('pin')) 'pin': n('pin'),
       if (nums.containsKey('pin2')) 'pin2': n('pin2'),
       if (nums.containsKey('count')) 'count': n('count'),
@@ -96,6 +100,23 @@ class _CapabilityEditorState extends State<CapabilityEditor> {
       decoration: BoxDecoration(color: c.bg, borderRadius: BorderRadius.circular(10), border: Border.all(color: c.border)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
+          Tooltip(
+            message: 'Symbol on the dashboard',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () async {
+                final k = await pickSymbol(context, current: e.symbol, fallback: defaultSymbolFor(e.type));
+                if (k != null) setState(() { e.symbol = k; widget.onChanged?.call(); });
+              },
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(border: Border.all(color: c.border), borderRadius: BorderRadius.circular(10)),
+                child: Icon(symbolIcon(e.symbol.isEmpty ? defaultSymbolFor(e.type) : e.symbol), color: c.accent, size: 22),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             flex: 5,
             child: DropdownButtonFormField<String>(

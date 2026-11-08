@@ -3,6 +3,7 @@ import '../widgets/ask_password.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../theme/app_colors.dart';
+import '../widgets/logging_card.dart';
 
 class _WifiCred {
   final int id;
@@ -396,6 +397,10 @@ class _GatewaySettingsScreenState extends ConsumerState<GatewaySettingsScreen> {
               ],
             ),
           ),
+
+          // ── Data logging ──
+          _heading('Data logging', 'Readings are stored with their time on the gateway and sent to the hub.'),
+          LoggingCard(gatewayId: widget.gatewayId),
 
           // ── Nodes ──
           _heading('Nodes', 'Actions for every node on this gateway.'),
