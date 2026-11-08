@@ -51,7 +51,7 @@ const _slides = <_Slide>[
       ),
       (
         Icons.touch_app_outlined,
-        'Tap a gateway to open its nodes; pull down or use ⟳ to refresh',
+        'Tap a gateway to open its nodes; pull down or use the refresh button to refresh',
       ),
     ],
   ),
@@ -59,7 +59,7 @@ const _slides = <_Slide>[
     Icons.bluetooth_searching,
     Color(0xFF00a8e8),
     'Add a gateway',
-    'No hotspot needed — new gateways are found over Bluetooth.',
+    'No hotspot needed. New gateways are found over Bluetooth.',
     [
       (Icons.bluetooth, 'Switch Bluetooth on and power up the gateway'),
       (Icons.wifi, 'Pick your Wi-Fi; the gateway tests it before saving'),
@@ -92,11 +92,11 @@ const _slides = <_Slide>[
     [
       (
         Icons.wifi_tethering,
-        'Menu → Set up HMI Wi-Fi gives a display its Wi-Fi without typing on it',
+        'Open the menu and choose Set up HMI Wi-Fi to give a display its Wi-Fi without typing on it',
       ),
       (
         Icons.qr_code_scanner,
-        'Menu → Pair a display: scan the QR code it shows and pick its gateway',
+        'Open the menu and choose Pair a display, then scan the QR code it shows and pick its gateway',
       ),
       (
         Icons.devices_other,
@@ -104,7 +104,7 @@ const _slides = <_Slide>[
       ),
       (
         Icons.lock_outline,
-        'A node appears on one display only — assigning it elsewhere moves it',
+        'A node appears on one display only. Assigning it elsewhere moves it',
       ),
     ],
   ),
@@ -126,7 +126,7 @@ const _slides = <_Slide>[
     Icons.menu,
     Color(0xFF58a6ff),
     'Everything is in the menu',
-    'Tap ☰ (or swipe from the left edge) any time.',
+    'Tap the menu button (or swipe from the left edge) any time.',
     [
       (Icons.router_outlined, 'Gateways, Add a gateway, Set up HMI Wi-Fi'),
       (Icons.tour_outlined, 'Replay this walkthrough whenever you like'),

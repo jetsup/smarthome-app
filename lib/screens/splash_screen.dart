@@ -70,7 +70,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   Future<void> _start() async {
-    // Request notification permission first — required for app function
+    // Request notification permission first, required for app function
     if (Platform.isAndroid) {
       ref.read(splashStateProvider.notifier).state = SplashState.permission;
       _set(
@@ -113,7 +113,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         granted ? _S.done : _S.failed,
         detail: granted
             ? null
-            : 'Not granted — you will not get offline alerts',
+            : 'Not granted, so you will not get offline alerts',
       );
       await _pace();
     } else {
@@ -173,7 +173,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         _set(
           2,
           _S.active,
-          detail: 'Saved login expired — signing in again',
+          detail: 'Saved login expired, signing in again',
           headline: 'Signing you in…',
         );
         final ok = await ref.read(authServiceProvider).trySilentLogin();

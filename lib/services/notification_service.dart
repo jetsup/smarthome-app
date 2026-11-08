@@ -1,11 +1,57 @@
 import 'dart:io';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
   bool _initFailed = false;
+
+  // Last online/offline state we already told the user about, per thing
+  // (e.g. "gw:abc", "node:abc:3"). Kept across screens and app restarts so
+  // the same change is never announced twice.
+  final Map<String, bool> _notified = {};
+  bool _loadedState = false;
+
+  Future<void> _loadState() async {
+    if (_loadedState) return;
+    _loadedState = true;
+    try {
+      final p = await SharedPreferences.getInstance();
+      for (final k in p.getKeys().where((k) => k.startsWith('notified:'))) {
+        final v = p.getBool(k);
+        if (v != null) _notified[k.substring(9)] = v;
+      }
+    } catch (_) {}
+  }
+
+  /// Announce an online/offline change once. Returns without notifying when
+  /// [online] equals what the user was last told. A thing first seen online
+  /// is just remembered; first seen offline is announced.
+  Future<void> reportOnline(
+    String key,
+    bool online,
+    String name, {
+    required String kind,
+    bool notifyOffline = true,
+    bool notifyOnline = true,
+  }) async {
+    await _loadState();
+    final last = _notified[key];
+    if (last == online) return;
+    _notified[key] = online;
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setBool('notified:$key', online);
+    } catch (_) {}
+    if (last == null && online) return;
+    if (!online && notifyOffline) {
+      await showOfflineNotification('$kind Offline', '$name is no longer connected.');
+    } else if (online && notifyOnline) {
+      await showOnlineNotification('$kind Online', '$name is back online.');
+    }
+  }
 
   Future<void> init() async {
     if (_initialized || _initFailed) return;
@@ -56,7 +102,7 @@ class NotificationService {
     );
     try {
       await _plugin.show(
-        DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title.hashCode ^ body.hashCode,
         title,
         body,
         details,
@@ -126,7 +172,7 @@ class NotificationService {
     );
     try {
       await _plugin.show(
-        DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title.hashCode ^ body.hashCode,
         title,
         body,
         details,

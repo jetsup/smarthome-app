@@ -146,8 +146,11 @@ class _AddGatewayScreenState extends ConsumerState<AddGatewayScreen> {
       final info = await _svc.connect(g.deviceId);
       _statusSub?.cancel();
       _statusSub = _svc.status.listen(_onStatus);
-      if (info.linked) {
-        throw '${g.name} is already linked to a hub. Hold its reset button for 5 seconds to clear it, then try again.';
+      // A gateway that still holds an old key but is not online (no Wi-Fi, or
+      // its hub is gone) can simply be set up again. Only one that is up and
+      // linked needs a reset first.
+      if (info.linked && info.wifiUp) {
+        throw '${g.name} is online and already linked to a hub. Hold its reset button for 5 seconds to clear it, then try again.';
       }
       if (info.wifiUp || info.wifiSaved) {
         setState(() => _step = _Step.name); // Wi-Fi already done earlier
@@ -377,7 +380,7 @@ class _AddGatewayScreenState extends ConsumerState<AddGatewayScreen> {
           children: [
             Expanded(
               child: Text(
-                'Power on the gateway. A new or reset gateway shows up here automatically — no hotspot needed.',
+                'Power on the gateway. A new or reset gateway shows up here automatically, no hotspot needed.',
                 style: TextStyle(color: context.c.muted),
               ),
             ),

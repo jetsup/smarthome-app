@@ -255,6 +255,48 @@ class _ModuleControlsState extends ConsumerState<ModuleControls> {
     ];
   }
 
+  /// The "random colour" choice. Patterns that bring their own colours cannot
+  /// use it: the swatch is greyed out with a cross, and tapping explains why.
+  Widget _randomSwatch(AppColors c, int idx, CapAction a, Map<String, dynamic> f, ActionParam p) {
+    final pattern = (f['pattern'] as num?)?.toInt() ?? 0;
+    final ok = !p.noRandom.contains(pattern);
+    final on = ok && f['random'] == true;
+    final swatch = Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const SweepGradient(colors: [
+          Color(0xFFFF3B30), Color(0xFFFFD60A), Color(0xFF34C759),
+          Color(0xFF00A8E8), Color(0xFFBF5AF2), Color(0xFFFF3B30),
+        ]),
+        border: Border.all(color: on ? c.text : c.border, width: on ? 3 : 1),
+      ),
+      child: ok
+          ? null
+          : Stack(alignment: Alignment.center, children: [
+              Container(decoration: BoxDecoration(shape: BoxShape.circle, color: c.bg.withValues(alpha: 0.7))),
+              const Icon(Icons.close, color: Color(0xFFDD1111), size: 26),
+            ]),
+    );
+    return Tooltip(
+      message: ok
+          ? 'Random colour: a new colour on every cycle'
+          : 'Random colour cannot be used with the selected pattern',
+      triggerMode: TooltipTriggerMode.tap,
+      child: GestureDetector(
+        onTap: ok
+            ? () {
+                f['random'] = !(f['random'] == true);
+                if (f['random'] != true) f[p.key] = p.def;
+                _changed(idx, a, f);
+              }
+            : null,
+        child: swatch,
+      ),
+    );
+  }
+
   void _changed(
     int idx,
     CapAction a,
@@ -308,6 +350,13 @@ class _ModuleControlsState extends ConsumerState<ModuleControls> {
             ],
             onChanged: (v) {
               f[p.key] = v;
+              // A pattern that cannot use the random colour falls back to the default one.
+              for (final q in a.params) {
+                if (q.allowRandom && f['random'] == true && q.noRandom.contains(v)) {
+                  f['random'] = false;
+                  f[q.key] = q.def;
+                }
+              }
               _changed(idx, a, f);
             },
           ),
@@ -328,6 +377,7 @@ class _ModuleControlsState extends ConsumerState<ModuleControls> {
                   for (final s in _swatches)
                     GestureDetector(
                       onTap: () {
+                        f['random'] = false;
                         f[p.key] = s;
                         _changed(idx, a, f);
                       },
@@ -340,12 +390,13 @@ class _ModuleControlsState extends ConsumerState<ModuleControls> {
                           ),
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: hex == s ? c.text : c.border,
-                            width: hex == s ? 3 : 1,
+                            color: (hex == s && f['random'] != true) ? c.text : c.border,
+                            width: (hex == s && f['random'] != true) ? 3 : 1,
                           ),
                         ),
                       ),
                     ),
+                  if (p.allowRandom) _randomSwatch(c, idx, a, f, p),
                 ],
               ),
             ],

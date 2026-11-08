@@ -32,6 +32,9 @@ class ActionParam {
   final int min, max;
   final dynamic def;
   final List<CapChoice> choices;
+  // Colour params: a "random colour" choice exists, except for these patterns.
+  final bool allowRandom;
+  final List<int> noRandom;
   ActionParam(Map<String, dynamic> j)
       : key = j['key'] as String? ?? '',
         label = j['label'] as String? ?? '',
@@ -39,6 +42,8 @@ class ActionParam {
         min = j['min'] as int? ?? 0,
         max = j['max'] as int? ?? 100,
         def = j['default'],
+        allowRandom = j['allowRandom'] == true,
+        noRandom = ((j['noRandom'] as List?) ?? const []).map((e) => (e as num).toInt()).toList(),
         choices = ((j['choices'] as List?) ?? const []).map((e) => CapChoice(e as Map<String, dynamic>)).toList();
 }
 

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/providers.dart';
 import '../theme/app_colors.dart';
+import '../widgets/app_drawer.dart';
 
 class _Entry {
   final int id;
@@ -101,6 +102,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   Widget build(BuildContext context) {
     final c = context.c;
     return Scaffold(
+      drawer: const AppDrawer(current: DrawerPage.activity),
       backgroundColor: c.bg,
       appBar: AppBar(title: const Text('Activity log')),
       body: Column(children: [

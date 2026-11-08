@@ -130,7 +130,7 @@ class _HmiSetupScreenState extends State<HmiSetupScreen> {
         setState(() {
           _step = _Step.pick;
           _error =
-              'The HMI could not connect: ${s.detail}. Nothing was saved — check the password and try again.';
+              'The HMI could not connect: ${s.detail}. Nothing was saved. Check the password and try again.';
         });
       case HmiWifiState.idle:
         break;

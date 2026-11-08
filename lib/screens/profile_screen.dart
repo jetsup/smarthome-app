@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../services/api_errors.dart';
 import '../theme/app_colors.dart';
+import '../widgets/app_drawer.dart';
 
 /// Your account: name, email, password and two-step verification.
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -284,7 +285,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           const SizedBox(height: 8),
           Text(
-            'Scan this in Google Authenticator, Microsoft Authenticator or similar — or add the key by hand:',
+            'Scan this in Google Authenticator, Microsoft Authenticator or similar, or add the key by hand:',
             style: TextStyle(color: context.c.muted, fontSize: 12),
           ),
           const SizedBox(height: 6),
@@ -410,7 +411,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'A 6-digit number was just sent to this phone — it appears as a prompt and a notification. Type it here.',
+              'A 6-digit number was just sent to this phone. It appears as a prompt and a notification. Type it here.',
               style: TextStyle(color: ctx.c.muted, fontSize: 13),
             ),
             const SizedBox(height: 12),
@@ -550,6 +551,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final c = context.c;
     return Scaffold(
+      drawer: const AppDrawer(current: DrawerPage.profile),
       appBar: AppBar(
         title: Text(
           'Profile & security',

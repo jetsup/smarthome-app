@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
 import '../models/node.dart';
 import '../providers/providers.dart';
 import '../services/api_errors.dart';
@@ -19,7 +22,24 @@ class NodeSettingsScreen extends ConsumerStatefulWidget {
 class _NodeSettingsScreenState extends ConsumerState<NodeSettingsScreen> {
   late final TextEditingController _name = TextEditingController(text: widget.node.name);
   late String _savedName = widget.node.name;
-  bool _saving = false, _restarting = false;
+  bool _saving = false, _restarting = false, _reloading = false;
+  String _pairCode = '';
+  String _mac = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCode();
+  }
+
+  Future<void> _loadCode() async {
+    try {
+      final r = await ref.read(apiServiceProvider).get(_base);
+      final code = (r.data is Map ? (r.data as Map)['pairCode'] : null) as String? ?? '';
+      final mac = (r.data is Map ? (r.data as Map)['mac'] : null) as String? ?? '';
+      if (mounted) setState(() { _pairCode = code; _mac = mac; });
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -84,6 +104,33 @@ class _NodeSettingsScreenState extends ConsumerState<NodeSettingsScreen> {
     }
   }
 
+  Future<void> _reload() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.c.card,
+        title: Text('Reload saved settings?', style: TextStyle(color: ctx.c.text)),
+        content: Text('The saved name, modules and key are sent to the node and it restarts.',
+            style: TextStyle(color: ctx.c.muted)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _reloading = true);
+    try {
+      await ref.read(apiServiceProvider).post('$_base/reload-config');
+      _toast('Saved settings sent to the node.');
+    } catch (e) {
+      _toast(apiError(e, 'Could not send the settings'), error: true);
+    } finally {
+      if (mounted) setState(() => _reloading = false);
+    }
+  }
+
   Widget _card(Widget child) => Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
@@ -116,6 +163,11 @@ class _NodeSettingsScreenState extends ConsumerState<NodeSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text('Hardware address (MAC): ${_mac.isEmpty ? 'not reported yet' : _mac} · Device ID ${widget.node.deviceId}',
+                style: TextStyle(color: c.muted, fontSize: 12)),
+          ),
           _heading('Node name', 'Shown in the app, on the website and on the display.'),
           _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             TextField(
@@ -142,6 +194,43 @@ class _NodeSettingsScreenState extends ConsumerState<NodeSettingsScreen> {
               ),
             ),
           ])),
+          _heading('Pairing code', 'To move this node to another gateway without reaching it, enter this code or scan the QR when pairing it there. Keep it private.'),
+          _card(_pairCode.isEmpty
+              ? Text('Loading…', style: TextStyle(color: c.muted))
+              : Row(children: [
+                  Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(6),
+                    child: QrImageView(data: 'SHNODE:$_pairCode', size: 128, padding: EdgeInsets.zero),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      SelectableText(_pairCode,
+                          style: TextStyle(color: c.text, fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 3)),
+                      TextButton.icon(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: _pairCode));
+                          _toast('Pairing code copied.');
+                        },
+                        icon: const Icon(Icons.copy, size: 16),
+                        label: const Text('Copy'),
+                      ),
+                    ]),
+                  ),
+                ])),
+          _heading('Saved settings',
+              'Send the name, modules and key saved here to the node again. Use it when the node blinks its LED as if it were new (its memory was erased or it was re-flashed). The node restarts and only needs to be in range of its gateway.'),
+          _card(SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _reloading ? null : _reload,
+              icon: _reloading
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.cloud_download_outlined),
+              label: const Text('Reload saved settings'),
+            ),
+          )),
           _heading('Maintenance'),
           _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Restart reboots the node. Its pairing and saved settings are kept.',

@@ -140,7 +140,7 @@ class _ApprovalDialogState extends State<_ApprovalDialog> {
       _ctrl.clear();
       setState(() {
         _busy = false;
-        _error = 'That number doesn’t match${r.attemptsLeft == null ? '' : ' — ${r.attemptsLeft} ${r.attemptsLeft == 1 ? 'try' : 'tries'} left'}.';
+        _error = 'That number doesn’t match${r.attemptsLeft == null ? '' : ', ${r.attemptsLeft} ${r.attemptsLeft == 1 ? 'try' : 'tries'} left'}.';
       });
     }
   }

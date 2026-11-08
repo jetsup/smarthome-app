@@ -261,7 +261,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (methods.isEmpty)
         Text('This account is set to approve sign-ins from a phone. Sign in on the website, or use a recovery code.',
             textAlign: TextAlign.center, style: TextStyle(color: c.muted, fontSize: 13)),
-      TextButton(onPressed: _backToStart, child: Text('← Back to sign in', style: TextStyle(color: c.muted))),
+      TextButton.icon(onPressed: _backToStart, icon: Icon(Icons.arrow_back, size: 18, color: c.muted), label: Text('Back to sign in', style: TextStyle(color: c.muted))),
     ]);
   }
 

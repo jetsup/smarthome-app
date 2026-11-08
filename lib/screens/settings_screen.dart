@@ -7,6 +7,7 @@ import '../config.dart';
 import '../providers/providers.dart';
 import '../providers/settings_provider.dart';
 import '../theme/app_colors.dart';
+import '../widgets/app_drawer.dart';
 import '../theme/app_theme.dart';
 import 'walkthrough_screen.dart';
 
@@ -58,6 +59,7 @@ class SettingsScreen extends ConsumerWidget {
     final mode = ref.watch(themeModeProvider);
 
     return Scaffold(
+      drawer: const AppDrawer(current: DrawerPage.settings),
       appBar: AppBar(title: Text('Settings', style: TextStyle(color: context.c.text, fontWeight: FontWeight.bold))),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         // ── Appearance ──

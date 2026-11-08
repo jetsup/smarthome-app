@@ -83,6 +83,34 @@ class _GatewaySettingsScreenState extends ConsumerState<GatewaySettingsScreen> {
 
   // ── Restart all nodes ──────────────────────────────────────────────────────
   bool _restarting = false;
+  bool _reloading = false;
+  Future<void> _reloadNodes() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.c.card,
+        title: Text('Reload saved settings on all nodes?', style: TextStyle(color: ctx.c.text)),
+        content: Text('Every node on this gateway gets its saved name, modules and key again and restarts.',
+            style: TextStyle(color: ctx.c.muted)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _reloading = true);
+    try {
+      final r = await ref.read(apiServiceProvider).post('$_base/reload-nodes');
+      final n = (r.data is Map ? (r.data as Map)['count'] : null) ?? 0;
+      _toast(n == 0 ? 'This gateway has no nodes yet.' : 'Settings sent to $n node${n == 1 ? '' : 's'}.');
+    } catch (e) {
+      _toast(_errorText(e, 'Could not send the settings. Is the gateway online?'), error: true);
+    } finally {
+      if (mounted) setState(() => _reloading = false);
+    }
+  }
   Future<void> _restartNodes() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -156,7 +184,7 @@ class _GatewaySettingsScreenState extends ConsumerState<GatewaySettingsScreen> {
       await _fetchCredentials();
       _toast(
         connectNow
-            ? 'Saved — the gateway is switching to “$ssid”.'
+            ? 'Saved. The gateway is switching to “$ssid”.'
             : 'Saved at the bottom of the list. The gateway uses it when higher ones are not available.',
       );
     } catch (e) {
@@ -186,7 +214,7 @@ class _GatewaySettingsScreenState extends ConsumerState<GatewaySettingsScreen> {
             '$_base/wifi/order',
             data: {'ids': _credentials.map((c) => c.id).toList()},
           );
-      _toast('Priority updated — the gateway uses this order at start-up.');
+      _toast('Priority updated. The gateway uses this order at start-up.');
     } catch (_) {
       if (mounted) setState(() => _credentials = before);
       _toast('Could not change the order', error: true);
@@ -303,6 +331,13 @@ class _GatewaySettingsScreenState extends ConsumerState<GatewaySettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              'Hardware address (MAC): ${(gw?.mac ?? '').isEmpty ? 'not reported yet' : gw!.mac} · ID ${widget.gatewayId}',
+              style: TextStyle(color: context.c.muted, fontSize: 12),
+            ),
+          ),
           // ── Name ──
           _heading(
             'Gateway name',
@@ -359,6 +394,17 @@ class _GatewaySettingsScreenState extends ConsumerState<GatewaySettingsScreen> {
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.restart_alt),
                     label: const Text('Restart all nodes'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _reloading ? null : _reloadNodes,
+                    icon: _reloading
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.cloud_download_outlined),
+                    label: const Text('Reload saved settings on all nodes'),
                   ),
                 ),
               ],

@@ -173,7 +173,7 @@ class _PairDisplayScreenState extends ConsumerState<PairDisplayScreen> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.65), borderRadius: BorderRadius.circular(8)),
               child: const Text(
-                'On the display choose “Pair this display → From the app or website”, then point the camera at its QR code.',
+                'On the display choose “Pair this display”, then “From the app or website”, then point the camera at its QR code.',
                 style: TextStyle(color: Colors.white),
               ),
             ),
@@ -218,7 +218,7 @@ class _PairDisplayScreenState extends ConsumerState<PairDisplayScreen> {
           style: TextStyle(color: c.muted, fontSize: 12)),
       const SizedBox(height: 10),
       if (gateways.isEmpty)
-        Text('You have no gateways yet — add one first.', style: TextStyle(color: c.muted))
+        Text('You have no gateways yet. Add one first.', style: TextStyle(color: c.muted))
       else
         RadioGroup<String>(
           groupValue: _gatewayId,

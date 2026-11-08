@@ -3,24 +3,58 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/providers.dart';
 import '../screens/activity_screen.dart';
+import '../screens/login_screen.dart';
 import '../screens/displays_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/settings_screen.dart';
 import '../theme/app_colors.dart';
 
-/// App-wide navigation: everything that used to crowd the top bar.
-class AppDrawer extends ConsumerWidget {
-  final VoidCallback onLogout;
-  final Future<void> Function() onRefresh;
-  const AppDrawer({super.key, required this.onLogout, required this.onRefresh});
+enum DrawerPage { gateways, displays, profile, activity, settings }
 
-  void _go(BuildContext context, Widget page, {bool refreshAfter = false}) {
-    Navigator.of(context).pop(); // close the drawer
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => page)).then((
-      _,
-    ) {
-      if (refreshAfter) onRefresh();
-    });
+/// App-wide navigation. Every screen it leads to carries the same drawer, so it
+/// can be opened from there too. The gateways screen is the root: the other
+/// screens are opened on top of it (and swap with each other), so Back always
+/// returns to the gateways first.
+class AppDrawer extends ConsumerWidget {
+  final DrawerPage current;
+  final VoidCallback? onLogout;
+  final Future<void> Function()? onRefresh;
+  const AppDrawer({
+    super.key,
+    this.current = DrawerPage.gateways,
+    this.onLogout,
+    this.onRefresh,
+  });
+
+  void _go(BuildContext context, DrawerPage target, Widget? page) {
+    final nav = Navigator.of(context);
+    nav.pop(); // close the drawer
+    if (target == current) return;
+    if (target == DrawerPage.gateways) {
+      nav.popUntil((r) => r.isFirst);
+      return;
+    }
+    final route = MaterialPageRoute(builder: (_) => page!);
+    if (current == DrawerPage.gateways) {
+      nav.push(route).then((_) => onRefresh?.call());
+    } else {
+      nav.pushReplacement(route);
+    }
+  }
+
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    final nav = Navigator.of(context);
+    nav.pop(); // close the drawer
+    if (onLogout != null) {
+      onLogout!();
+      return;
+    }
+    await ref.read(authServiceProvider).logout();
+    ref.read(apiServiceProvider).clearToken();
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
   }
 
   @override
@@ -120,15 +154,16 @@ class AppDrawer extends ConsumerWidget {
                     context,
                     Icons.router_outlined,
                     'Gateways',
-                    selected: true,
-                    onTap: () => Navigator.of(context).pop(),
+                    selected: current == DrawerPage.gateways,
+                    onTap: () => _go(context, DrawerPage.gateways, null),
                   ),
                   _item(
                     context,
                     Icons.tv_outlined,
                     'Displays',
                     subtitle: 'Paired HMI screens and their nodes',
-                    onTap: () => _go(context, const DisplaysScreen()),
+                    selected: current == DrawerPage.displays,
+                    onTap: () => _go(context, DrawerPage.displays, const DisplaysScreen()),
                   ),
 
                   _section(context, 'App'),
@@ -137,21 +172,24 @@ class AppDrawer extends ConsumerWidget {
                     Icons.person_outline,
                     'Profile & security',
                     subtitle: 'Your details, password, two-step',
-                    onTap: () => _go(context, const ProfileScreen()),
+                    selected: current == DrawerPage.profile,
+                    onTap: () => _go(context, DrawerPage.profile, const ProfileScreen()),
                   ),
                   _item(
                     context,
                     Icons.history,
                     'Activity log',
                     subtitle: 'Sign-ins and changes, with devices',
-                    onTap: () => _go(context, const ActivityScreen()),
+                    selected: current == DrawerPage.activity,
+                    onTap: () => _go(context, DrawerPage.activity, const ActivityScreen()),
                   ),
                   _item(
                     context,
                     Icons.settings_outlined,
                     'Settings',
                     subtitle: 'Theme, accent colour, alerts',
-                    onTap: () => _go(context, const SettingsScreen()),
+                    selected: current == DrawerPage.settings,
+                    onTap: () => _go(context, DrawerPage.settings, const SettingsScreen()),
                   ),
                 ],
               ),
@@ -187,8 +225,7 @@ class AppDrawer extends ConsumerWidget {
                   ),
                 );
                 if (ok != true || !context.mounted) return;
-                Navigator.of(context).pop();
-                onLogout();
+                await _signOut(context, ref);
               },
             ),
             const SizedBox(height: 8),

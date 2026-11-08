@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/display.dart';
 import '../providers/providers.dart';
 import '../theme/app_colors.dart';
+import '../widgets/app_drawer.dart';
 import 'display_detail_screen.dart';
 import 'hmi_setup_screen.dart';
 import 'pair_display_screen.dart';
@@ -78,6 +79,7 @@ class _DisplaysScreenState extends ConsumerState<DisplaysScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: const AppDrawer(current: DrawerPage.displays),
       appBar: AppBar(
         title: Text(
           'Displays',
@@ -140,7 +142,7 @@ class _DisplaysScreenState extends ConsumerState<DisplaysScreen> {
       ),
       const SizedBox(height: 8),
       Text(
-        'On the display choose “Pair this display → From the app or website”, then scan its QR code here.',
+        'On the display choose “Pair this display”, then “From the app or website”, then scan its QR code here.',
         textAlign: TextAlign.center,
         style: TextStyle(color: context.c.muted, height: 1.4),
       ),

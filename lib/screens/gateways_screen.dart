@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../providers/settings_provider.dart';
@@ -20,7 +21,8 @@ class GatewaysScreen extends ConsumerStatefulWidget {
 
 class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
   Timer? _pollTimer;
-  final Map<String, bool> _previousOnline = {};
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  DateTime? _lastBack;
 
   @override
   void initState() {
@@ -70,26 +72,41 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
     final current = ref.read(gatewaysProvider);
     final notifications = ref.read(notificationServiceProvider);
 
+    final prefs = ref.read(settingsProvider);
     for (final gw in current) {
-      final prevOnline = _previousOnline[gw.id] ?? true;
-      final prefs = ref.read(settingsProvider);
-      if (prevOnline && !gw.online) {
-        if (prefs.notifyOffline) {
-          notifications.showOfflineNotification(
-            'Gateway Offline',
-            '${gw.name} is no longer connected.',
-          );
-        }
-      } else if (!prevOnline && gw.online) {
-        if (prefs.notifyOnline) {
-          notifications.showOnlineNotification(
-            'Gateway Online',
-            '${gw.name} is back online.',
-          );
-        }
-      }
-      _previousOnline[gw.id] = gw.online;
+      notifications.reportOnline(
+        'gw:${gw.id}',
+        gw.online,
+        gw.name,
+        kind: 'Gateway',
+        notifyOffline: prefs.notifyOffline,
+        notifyOnline: prefs.notifyOnline,
+      );
     }
+  }
+
+  // The gateways screen is the root: Back closes the drawer, then asks twice
+  // before leaving the app.
+  void _onBack() {
+    final scaffold = _scaffoldKey.currentState;
+    if (scaffold != null && scaffold.isDrawerOpen) {
+      scaffold.closeDrawer();
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastBack != null && now.difference(_lastBack!) < const Duration(seconds: 2)) {
+      SystemNavigator.pop();
+      return;
+    }
+    _lastBack = now;
+    final m = ScaffoldMessenger.of(context);
+    m.hideCurrentSnackBar();
+    m.showSnackBar(
+      const SnackBar(
+        content: Text('Press back again to exit the app'),
+        duration: Duration(seconds: 2),
+      ),
+    );
   }
 
   void _checkConnectivity() {
@@ -106,7 +123,7 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
       if (!isLocal) {
         scaffold.showSnackBar(
           const SnackBar(
-            content: Text('Left local network — using remote connection'),
+            content: Text('Left local network, using remote connection'),
           ),
         );
       }
@@ -142,10 +159,20 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
       (_, __) => _startPolling(),
     );
 
-    return MfaApprovalHost(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onBack();
+      },
+      child: MfaApprovalHost(
       child: Scaffold(
+        key: _scaffoldKey,
         backgroundColor: context.c.bg,
-        drawer: AppDrawer(onLogout: _logout, onRefresh: _load),
+        drawer: AppDrawer(
+          current: DrawerPage.gateways,
+          onLogout: _logout,
+          onRefresh: _load,
+        ),
         appBar: AppBar(
           backgroundColor: context.c.card,
           iconTheme: IconThemeData(color: context.c.text),
@@ -212,6 +239,7 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
                 ),
               ),
       ),
+      ),
     );
   }
 }
@@ -242,7 +270,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Power on a gateway, switch Bluetooth on and tap “Add gateway” — the app finds it and links it to your hub.',
+            'Power on a gateway, switch Bluetooth on and tap “Add gateway”. The app finds it and links it to your hub.',
             textAlign: TextAlign.center,
             style: TextStyle(color: context.c.muted, height: 1.4),
           ),

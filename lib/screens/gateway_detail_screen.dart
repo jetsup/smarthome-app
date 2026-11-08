@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
+import '../providers/settings_provider.dart';
 import '../models/node.dart';
 import 'gateway_settings_screen.dart';
 import 'node_detail_screen.dart';
@@ -9,6 +10,7 @@ import '../services/api_errors.dart';
 import '../services/catalog.dart';
 import '../theme/app_colors.dart';
 import '../widgets/capability_editor.dart';
+import '../widgets/node_code_scanner.dart';
 
 class GatewayDetailScreen extends ConsumerStatefulWidget {
   final String gatewayId;
@@ -21,7 +23,6 @@ class GatewayDetailScreen extends ConsumerStatefulWidget {
 
 class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
   Timer? _pollTimer;
-  final Map<int, bool> _previousOnline = {};
   List<Map<String, dynamic>> _discovered = [];
   bool _scanning = false;
   final Set<int> _provisioningIds = {};
@@ -45,20 +46,16 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
     final nodes = ref.read(nodesProvider(widget.gatewayId));
     final notifications = ref.read(notificationServiceProvider);
 
+    final prefs = ref.read(settingsProvider);
     for (final n in nodes) {
-      final prev = _previousOnline[n.deviceId] ?? true;
-      if (prev && !n.isOnline) {
-        notifications.showOfflineNotification(
-          'Node Offline',
-          'Device ${n.deviceId} (${n.typeLabel}) is no longer connected.',
-        );
-      } else if (!prev && n.isOnline) {
-        notifications.showOnlineNotification(
-          'Node Online',
-          'Device ${n.deviceId} (${n.typeLabel}) is back online.',
-        );
-      }
-      _previousOnline[n.deviceId] = n.isOnline;
+      notifications.reportOnline(
+        'node:${widget.gatewayId}:${n.deviceId}',
+        n.isOnline,
+        'Device ${n.deviceId} (${n.typeLabel})',
+        kind: 'Node',
+        notifyOffline: prefs.notifyOffline,
+        notifyOnline: prefs.notifyOnline,
+      );
     }
 
     final gw = ref
@@ -73,23 +70,15 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
   }
 
   void _pollGw(gateway) {
-    final previousOnline = _previousOnline[widget.gatewayId.hashCode] ?? true;
-    if (previousOnline && !gateway.online) {
-      ref
-          .read(notificationServiceProvider)
-          .showOfflineNotification(
-            'Gateway Offline',
-            '${gateway.name} is no longer connected.',
-          );
-    } else if (!previousOnline && gateway.online) {
-      ref
-          .read(notificationServiceProvider)
-          .showOnlineNotification(
-            'Gateway Online',
-            '${gateway.name} is back online.',
-          );
-    }
-    _previousOnline[widget.gatewayId.hashCode] = gateway.online;
+    final prefs = ref.read(settingsProvider);
+    ref.read(notificationServiceProvider).reportOnline(
+      'gw:${widget.gatewayId}',
+      gateway.online,
+      gateway.name,
+      kind: 'Gateway',
+      notifyOffline: prefs.notifyOffline,
+      notifyOnline: prefs.notifyOnline,
+    );
   }
 
   Future<void> _fetchDiscovered() async {
@@ -129,8 +118,10 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
   Future<void> _provision(
     int deviceId,
     String name,
-    List<Map<String, dynamic>> caps,
-  ) async {
+    List<Map<String, dynamic>> caps, {
+    String code = '',
+    String adoptCode = '',
+  }) async {
     final api = ref.read(apiServiceProvider);
     setState(() => _provisioningIds.add(deviceId));
     void say(String m) {
@@ -141,7 +132,13 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
     try {
       final r = await api.post(
         '/api/gateways/${widget.gatewayId}/provision',
-        data: {'deviceId': deviceId, 'name': name, 'capabilitiesConfig': caps},
+        data: {
+          'deviceId': deviceId,
+          'name': name,
+          'capabilitiesConfig': caps,
+          if (code.isNotEmpty) 'code': code,
+          if (adoptCode.isNotEmpty) 'adoptCode': adoptCode,
+        },
       );
       final status =
           (r.data is Map ? (r.data as Map)['status'] : null) as String?;
@@ -189,7 +186,10 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
     final linkedDeviceIds = nodes.map((n) => n.deviceId).toSet();
     final unlinked = _discovered.where((d) {
       final did = d['deviceId'] as int? ?? 0;
-      return !linkedDeviceIds.contains(did) && !_provisioningIds.contains(did);
+      // A node the hub still has saved but that was reset shows up again here.
+      final known = d['known'] == true;
+      return (!linkedDeviceIds.contains(did) || known) &&
+          !_provisioningIds.contains(did);
     }).toList();
 
     return Scaffold(
@@ -341,7 +341,11 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
                 ...unlinked.map(
                   (d) => _DiscoveredCard(d, _provisioningIds, () {
                     final did = d['deviceId'] as int;
-                    _showProvisionDialog(did);
+                    if (d['known'] == true) {
+                      _provision(did, '', const []); // saved settings are reused
+                    } else {
+                      _showProvisionDialog(did, paired: d['paired'] == true);
+                    }
                   }),
                 ),
               ],
@@ -352,7 +356,7 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
     );
   }
 
-  Future<void> _showProvisionDialog(int deviceId) async {
+  Future<void> _showProvisionDialog(int deviceId, {bool paired = false}) async {
     CapCatalog catalog;
     try {
       catalog = await ref.read(capCatalogProvider.future);
@@ -372,9 +376,11 @@ class _GatewayDetailScreenState extends ConsumerState<GatewayDetailScreen> {
       builder: (ctx) => _ProvisionDialog(
         catalog: catalog,
         deviceId: deviceId,
-        onProvision: (name, caps) {
+        paired: paired,
+        onProvision: (name, caps, code, adoptCode) {
           Navigator.of(ctx).pop();
-          _provision(deviceId, name, caps);
+          _provision(deviceId, name, adoptCode.isNotEmpty ? const [] : caps,
+              code: code, adoptCode: adoptCode);
         },
       ),
     );
@@ -444,7 +450,12 @@ class _DiscoveredCard extends StatelessWidget {
           'Device $did',
           style: TextStyle(color: context.c.text, fontSize: 14),
         ),
-        subtitle: const Row(children: [_DiscBadge()]),
+        subtitle: data['known'] == true
+            ? Text(
+                'Was reset, saved as “${data['knownName'] ?? ''}”. Re-pair to restore it.',
+                style: TextStyle(color: context.c.muted, fontSize: 12),
+              )
+            : const Row(children: [_DiscBadge()]),
         trailing: provisioning
             ? SizedBox(
                 width: 16,
@@ -457,7 +468,7 @@ class _DiscoveredCard extends StatelessWidget {
             : TextButton(
                 onPressed: onConnect,
                 child: Text(
-                  'Connect',
+                  data['known'] == true ? 'Re-pair' : 'Connect',
                   style: TextStyle(color: context.c.accent, fontSize: 13),
                 ),
               ),
@@ -492,11 +503,13 @@ class _DiscBadge extends StatelessWidget {
 class _ProvisionDialog extends StatefulWidget {
   final CapCatalog catalog;
   final int deviceId;
-  final void Function(String name, List<Map<String, dynamic>> caps) onProvision;
+  final bool paired; // already paired to a gateway: its code is needed
+  final void Function(String name, List<Map<String, dynamic>> caps, String code, String adoptCode) onProvision;
 
   const _ProvisionDialog({
     required this.catalog,
     required this.deviceId,
+    required this.paired,
     required this.onProvision,
   });
 
@@ -506,6 +519,8 @@ class _ProvisionDialog extends StatefulWidget {
 
 class _ProvisionDialogState extends State<_ProvisionDialog> {
   final _nameCtrl = TextEditingController();
+  final _codeCtrl = TextEditingController();
+  final _adoptCtrl = TextEditingController();
   late final List<CapEntry> _caps = [
     CapEntry(widget.catalog.of('digitalOutput') ?? widget.catalog.types.first),
   ];
@@ -530,6 +545,66 @@ class _ProvisionDialogState extends State<_ProvisionDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (widget.paired) ...[
+                _fieldLabel('Pairing code'),
+                const SizedBox(height: 4),
+                Row(children: [
+                  Expanded(
+                    child: _darkField(
+                      child: TextField(
+                        controller: _codeCtrl,
+                        textCapitalization: TextCapitalization.characters,
+                        maxLength: 16,
+                        style: TextStyle(color: context.c.text, fontSize: 14, letterSpacing: 2),
+                        decoration: _inputDec('8 letters and digits').copyWith(counterText: ''),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Scan QR code',
+                    icon: Icon(Icons.qr_code_scanner, color: context.c.accent),
+                    onPressed: () async {
+                      final code = await scanNodeCode(context);
+                      if (code != null && mounted) setState(() => _codeCtrl.text = code);
+                    },
+                  ),
+                ]),
+                const SizedBox(height: 4),
+                Text(
+                  'This node is already paired to a gateway. Enter its code, or scan the QR code from its Settings screen, to move it here.',
+                  style: TextStyle(color: context.c.muted, fontSize: 11),
+                ),
+                const SizedBox(height: 16),
+              ],
+              _fieldLabel('Take over a previous node (optional)'),
+              const SizedBox(height: 4),
+              Row(children: [
+                Expanded(
+                  child: _darkField(
+                    child: TextField(
+                      controller: _adoptCtrl,
+                      textCapitalization: TextCapitalization.characters,
+                      maxLength: 16,
+                      style: TextStyle(color: context.c.text, fontSize: 14, letterSpacing: 2),
+                      decoration: _inputDec('Code of the node it replaces').copyWith(counterText: ''),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Scan QR code',
+                  icon: Icon(Icons.qr_code_scanner, color: context.c.accent),
+                  onPressed: () async {
+                    final code = await scanNodeCode(context);
+                    if (code != null && mounted) setState(() => _adoptCtrl.text = code);
+                  },
+                ),
+              ]),
+              const SizedBox(height: 2),
+              Text(
+                'Copies that node’s name, modules, display and rules. Its modules are used instead of the ones below.',
+                style: TextStyle(color: context.c.muted, fontSize: 11),
+              ),
+              const SizedBox(height: 16),
               _fieldLabel('Node Name'),
               const SizedBox(height: 4),
               _darkField(
@@ -556,7 +631,7 @@ class _ProvisionDialogState extends State<_ProvisionDialog> {
           style: ElevatedButton.styleFrom(backgroundColor: context.c.okStrong),
           onPressed: () {
             final caps = _caps.map((c) => c.toMap()).toList();
-            widget.onProvision(_nameCtrl.text, caps);
+            widget.onProvision(_nameCtrl.text, caps, _codeCtrl.text.trim(), _adoptCtrl.text.trim());
           },
           child: const Text('Confirm', style: TextStyle(color: Colors.white)),
         ),
@@ -628,13 +703,6 @@ class _NodeCard extends StatelessWidget {
               node.typeLabel,
               style: TextStyle(color: context.c.muted, fontSize: 11),
             ),
-            if (node.value != null) ...[
-              const SizedBox(width: 8),
-              Text(
-                'Value: ${node.value}',
-                style: TextStyle(color: context.c.accent, fontSize: 11),
-              ),
-            ],
           ],
         ),
         trailing: Icon(Icons.chevron_right, color: context.c.subtle),
