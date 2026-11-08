@@ -9,6 +9,7 @@ import 'gateway_detail_screen.dart';
 import '../widgets/app_drawer.dart';
 import '../widgets/mfa_approval_host.dart';
 import 'add_gateway_screen.dart';
+import 'unassigned_nodes_screen.dart';
 import 'walkthrough_screen.dart';
 import '../theme/app_colors.dart';
 
@@ -22,6 +23,7 @@ class GatewaysScreen extends ConsumerStatefulWidget {
 class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
   Timer? _pollTimer;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  int _unassigned = 0;
   DateTime? _lastBack;
 
   @override
@@ -61,7 +63,20 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
       _pollTimer = Timer.periodic(Duration(seconds: secs), (_) => _poll());
   }
 
+  Future<void> _loadUnassigned() async {
+    try {
+      final r = await ref.read(apiServiceProvider).get('/api/nodes/unassigned');
+      if (mounted) setState(() => _unassigned = (r.data as List?)?.length ?? 0);
+    } catch (_) {}
+  }
+
+  Future<void> _openUnassigned() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UnassignedNodesScreen()));
+    _loadUnassigned();
+  }
+
   Future<void> _load() async {
+    _loadUnassigned();
     ref.read(gatewaysProvider.notifier).fetchAll();
     _checkConnectivity();
   }
@@ -228,16 +243,47 @@ class _GatewaysScreenState extends ConsumerState<GatewaysScreen> {
           icon: const Icon(Icons.add),
           label: const Text('Add gateway'),
         ),
-        body: gateways.isEmpty
-            ? _EmptyState(onAdd: _addGateway, onRefresh: _load)
-            : RefreshIndicator(
-                onRefresh: _load,
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
-                  itemCount: gateways.length,
-                  itemBuilder: (_, i) => _GatewayCard(gateways[i]),
+        body: Column(
+          children: [
+            if (_unassigned > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                child: Card(
+                  color: context.c.card,
+                  margin: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: context.c.accent),
+                  ),
+                  child: ListTile(
+                    leading: Icon(Icons.sensors, color: context.c.accent),
+                    title: Text(
+                      '$_unassigned unassigned node${_unassigned == 1 ? '' : 's'}',
+                      style: TextStyle(color: context.c.text, fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      'Left by a deleted gateway. Tap to give them to a gateway.',
+                      style: TextStyle(color: context.c.muted, fontSize: 12),
+                    ),
+                    trailing: Icon(Icons.chevron_right, color: context.c.subtle),
+                    onTap: _openUnassigned,
+                  ),
                 ),
               ),
+            Expanded(
+              child: gateways.isEmpty
+                  ? _EmptyState(onAdd: _addGateway, onRefresh: _load)
+                  : RefreshIndicator(
+                      onRefresh: _load,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                        itemCount: gateways.length,
+                        itemBuilder: (_, i) => _GatewayCard(gateways[i]),
+                      ),
+                    ),
+            ),
+          ],
+        ),
       ),
       ),
     );

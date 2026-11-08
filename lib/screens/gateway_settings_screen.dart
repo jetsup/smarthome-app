@@ -84,6 +84,40 @@ class _GatewaySettingsScreenState extends ConsumerState<GatewaySettingsScreen> {
   // ── Restart all nodes ──────────────────────────────────────────────────────
   bool _restarting = false;
   bool _reloading = false;
+  bool _deleting = false;
+  Future<void> _deleteGateway() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.c.card,
+        title: Text('Delete this gateway?', style: TextStyle(color: ctx.c.text)),
+        content: Text(
+          'The gateway is removed with its displays, rules and saved Wi-Fi networks. Its nodes are not reset: they stay as unassigned nodes that you can give to another gateway.',
+          style: TextStyle(color: ctx.c.muted),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: ctx.c.badStrong),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _deleting = true);
+    try {
+      await ref.read(apiServiceProvider).delete(_base);
+      await ref.read(gatewaysProvider.notifier).fetchAll();
+      if (!mounted) return;
+      Navigator.of(context).popUntil((r) => r.isFirst);
+    } catch (e) {
+      _toast(_errorText(e, 'Could not delete the gateway'), error: true);
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
   Future<void> _reloadNodes() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -408,6 +442,24 @@ class _GatewaySettingsScreenState extends ConsumerState<GatewaySettingsScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+
+          _heading(
+            'Delete gateway',
+            'Its nodes are not reset. They stay as unassigned nodes you can give to another gateway.',
+          ),
+          _card(
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(foregroundColor: context.c.bad),
+                onPressed: _deleting ? null : _deleteGateway,
+                icon: _deleting
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.delete_outline),
+                label: const Text('Delete gateway'),
+              ),
             ),
           ),
 
