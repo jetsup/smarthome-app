@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../services/api_errors.dart';
 import '../theme/app_colors.dart';
+import '../widgets/ask_password.dart';
 import '../widgets/app_drawer.dart';
 
 /// Your account: name, email, password and two-step verification.
@@ -80,41 +81,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Future<String?> _askPassword(String why) async {
-    final ctl = TextEditingController();
-    final r = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirm your password'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(why, style: TextStyle(color: ctx.c.muted, fontSize: 13)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: ctl,
-              obscureText: true,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Password'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctl.text),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    );
-    return (r == null || r.isEmpty) ? null : r;
-  }
+  Future<String?> _askPassword(String why) =>
+      askPassword(context, 'Confirm your password', why);
 
   // ── details ──
   Future<void> _saveDetails() async {
@@ -734,8 +702,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           children: [
             TextField(
               controller: _curPw,
-              obscureText: true,
-              decoration: _dec('Current password'),
+              obscureText: !_showPw,
+              decoration: _dec(
+                'Current password',
+                suffix: IconButton(
+                  tooltip: _showPw ? 'Hide passwords' : 'Show passwords',
+                  icon: Icon(_showPw ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _showPw = !_showPw),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
