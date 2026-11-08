@@ -22,7 +22,7 @@ class NodeSettingsScreen extends ConsumerStatefulWidget {
 class _NodeSettingsScreenState extends ConsumerState<NodeSettingsScreen> {
   late final TextEditingController _name = TextEditingController(text: widget.node.name);
   late String _savedName = widget.node.name;
-  bool _saving = false, _restarting = false, _reloading = false;
+  bool _saving = false, _restarting = false, _reloading = false, _unpairing = false;
   String _pairCode = '';
   String _mac = '';
 
@@ -101,6 +101,44 @@ class _NodeSettingsScreenState extends ConsumerState<NodeSettingsScreen> {
       _toast(apiError(e, 'Could not restart the node'), error: true);
     } finally {
       if (mounted) setState(() => _restarting = false);
+    }
+  }
+
+  Future<void> _unpair() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ctx.c.card,
+        title: Text('Unpair this node?', style: TextStyle(color: ctx.c.text)),
+        content: Text(
+          'It is reset and removed from this gateway, together with its rules and bindings. Any gateway in range can then discover it.',
+          style: TextStyle(color: ctx.c.muted),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: ctx.c.badStrong),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Unpair'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _unpairing = true);
+    try {
+      await ref.read(apiServiceProvider).post('$_base/unpair');
+      await ref.read(nodesProvider(widget.node.gatewayId).notifier).fetchNodes();
+      _toast('The node was unpaired.');
+      if (mounted) {
+        // back to the gateway: settings and node screens are both gone
+        Navigator.of(context).pop();
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      _toast(apiError(e, 'Could not unpair the node'), error: true);
+      if (mounted) setState(() => _unpairing = false);
     }
   }
 
@@ -229,6 +267,18 @@ class _NodeSettingsScreenState extends ConsumerState<NodeSettingsScreen> {
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.cloud_download_outlined),
               label: const Text('Reload saved settings'),
+            ),
+          )),
+          _heading('Unpair', 'The node forgets this gateway and its settings and is removed here. Afterwards any gateway in range can discover and pair it again.'),
+          _card(SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(foregroundColor: c.bad),
+              onPressed: _unpairing ? null : _unpair,
+              icon: _unpairing
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.link_off),
+              label: const Text('Unpair node'),
             ),
           )),
           _heading('Maintenance'),

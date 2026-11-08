@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/ask_password.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
 import '../theme/app_colors.dart';
@@ -86,30 +87,17 @@ class _GatewaySettingsScreenState extends ConsumerState<GatewaySettingsScreen> {
   bool _reloading = false;
   bool _deleting = false;
   Future<void> _deleteGateway() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.c.card,
-        title: Text('Delete this gateway?', style: TextStyle(color: ctx.c.text)),
-        content: Text(
-          'The gateway is removed with its displays, rules and saved Wi-Fi networks. Its nodes are not reset: they stay as unassigned nodes that you can give to another gateway.',
-          style: TextStyle(color: ctx.c.muted),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: ctx.c.badStrong),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final pw = await askPassword(
+      context,
+      'Delete this gateway?',
+      'The gateway is removed with its displays, rules and saved Wi-Fi networks. Nodes that are online are unpaired so any gateway can discover them. Nodes that cannot be reached are kept as unassigned nodes. Enter your password to confirm.',
+      confirm: 'Delete',
+      danger: true,
     );
-    if (ok != true) return;
+    if (pw == null) return;
     setState(() => _deleting = true);
     try {
-      await ref.read(apiServiceProvider).delete(_base);
+      await ref.read(apiServiceProvider).delete(_base, data: {'password': pw});
       await ref.read(gatewaysProvider.notifier).fetchAll();
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
@@ -447,7 +435,7 @@ class _GatewaySettingsScreenState extends ConsumerState<GatewaySettingsScreen> {
 
           _heading(
             'Delete gateway',
-            'Its nodes are not reset. They stay as unassigned nodes you can give to another gateway.',
+            'Online nodes are unpaired so any gateway can discover them. Nodes that cannot be reached are kept as unassigned nodes. Asks for your password.',
           ),
           _card(
             child: SizedBox(
